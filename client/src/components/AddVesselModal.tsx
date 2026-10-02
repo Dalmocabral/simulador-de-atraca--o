@@ -352,7 +352,7 @@ export default function AddVesselModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-white border border-[#d6e2e6] rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+      <DialogContent className="sm:!max-w-4xl md:!max-w-5xl w-[94vw] p-0 overflow-hidden bg-white border border-[#d6e2e6] rounded-xl shadow-2xl flex flex-col max-h-[88vh]">
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-[#102d40] to-[#1a445d] text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -368,26 +368,23 @@ export default function AddVesselModal({
                   Tecon Rio
                 </span>
               </div>
-              <DialogDescription className="text-xs text-cyan-100/80 m-0">
-                Mostrando somente navios programados para atracar no Terminal (TECONTPROLONG e TECONT1), com dimensões oficiais e catálogo permanente.
-              </DialogDescription>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-[#e1e9ec] bg-[#f8fafb] px-6 gap-2 pt-2">
+        <div className="flex border-b border-[#e1e9ec] bg-[#f8fafb] px-6 gap-2 pt-2 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("praticagem")}
-            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex items-center gap-2 border-t border-x ${
+            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex items-center gap-2 border-t border-x whitespace-nowrap cursor-pointer ${
               activeTab === "praticagem"
                 ? "bg-white text-[#102d40] border-[#d4e1e5] border-b-transparent shadow-sm translate-y-[1px]"
                 : "text-[#627780] hover:text-[#102d40] border-transparent hover:bg-white/50"
             }`}
           >
-            <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-            <span>Atracações no Terminal Rio</span>
+            <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse flex-shrink-0" />
+            <span>Atracações no Terminal</span>
             {liveManeuvers.length > 0 && (
               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {liveManeuvers.length} navios
@@ -398,13 +395,13 @@ export default function AddVesselModal({
           <button
             type="button"
             onClick={() => setActiveTab("catalog")}
-            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex items-center gap-2 border-t border-x ${
+            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex items-center gap-2 border-t border-x whitespace-nowrap cursor-pointer ${
               activeTab === "catalog"
                 ? "bg-white text-[#102d40] border-[#d4e1e5] border-b-transparent shadow-sm translate-y-[1px]"
                 : "text-[#627780] hover:text-[#102d40] border-transparent hover:bg-white/50"
             }`}
           >
-            <Layers className="w-3.5 h-3.5 text-[#16869a]" />
+            <Layers className="w-3.5 h-3.5 text-[#16869a] flex-shrink-0" />
             <span>Catálogo Salvo (Histórico)</span>
             <span className="bg-cyan-100 text-cyan-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {catalog.length}
@@ -414,91 +411,102 @@ export default function AddVesselModal({
           <button
             type="button"
             onClick={() => setActiveTab("manual")}
-            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex items-center gap-2 border-t border-x ${
+            className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all flex items-center gap-2 border-t border-x whitespace-nowrap cursor-pointer ${
               activeTab === "manual"
                 ? "bg-white text-[#102d40] border-[#d4e1e5] border-b-transparent shadow-sm translate-y-[1px]"
                 : "text-[#627780] hover:text-[#102d40] border-transparent hover:bg-white/50"
             }`}
           >
-            <Plus className="w-3.5 h-3.5 text-[#627780]" />
+            <Plus className="w-3.5 h-3.5 text-[#627780] flex-shrink-0" />
             <span>Cadastro Manual</span>
           </button>
         </div>
 
         {/* Tab 1: Praticagem RJ */}
         {activeTab === "praticagem" && (
-          <div className="flex-1 flex flex-col min-h-0 p-6 bg-white overflow-hidden">
-            {/* Top Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={praticagemSearch}
-                    onChange={(e) => setPraticagemSearch(e.target.value)}
-                    placeholder="Buscar navio, berço, IMO..."
-                    className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a]"
-                  />
-                  {praticagemSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setPraticagemSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 bg-[#f1f5f7] p-1 rounded-lg border border-[#e2eaed] text-[11px]">
+          <div className="flex-1 flex flex-col min-h-0 p-5 bg-white overflow-hidden">
+            {/* Toolbar Row 1: Search & Sync */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={praticagemSearch}
+                  onChange={(e) => setPraticagemSearch(e.target.value)}
+                  placeholder="Buscar navio por nome, berço, IMO..."
+                  className="w-full pl-9 pr-8 py-2 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a] bg-white shadow-xs"
+                />
+                {praticagemSearch && (
                   <button
                     type="button"
-                    onClick={() => setPraticagemFilter("all")}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                      praticagemFilter === "all" ? "bg-white text-[#102d40] shadow-sm font-bold" : "text-[#60767e]"
-                    }`}
+                    onClick={() => setPraticagemSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    Todos do Terminal ({liveManeuvers.length})
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setPraticagemFilter("prolong")}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                      praticagemFilter === "prolong" ? "bg-white text-[#102d40] shadow-sm font-bold" : "text-[#60767e]"
-                    }`}
-                  >
-                    Prolongamento ({liveManeuvers.filter((m) => (m.berthTo || "").toUpperCase().includes("PROLONG")).length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPraticagemFilter("tecon1")}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                      praticagemFilter === "tecon1" ? "bg-white text-[#102d40] shadow-sm font-bold" : "text-[#60767e]"
-                    }`}
-                  >
-                    Tecon 1 ({liveManeuvers.filter((m) => (m.berthTo || "").toUpperCase().includes("TECONT1")).length})
-                  </button>
-                </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 shrink-0 justify-end">
                 {praticagemUpdated && (
-                  <span className="text-[10px] text-[#71858e] flex items-center gap-1 font-medium">
-                    <Clock className="w-3 h-3 text-[#16869a]" /> {praticagemUpdated}
+                  <span className="text-[11px] text-[#6b7f88] flex items-center gap-1.5 font-medium whitespace-nowrap">
+                    <Clock className="w-3.5 h-3.5 text-[#16869a]" /> Atualizado: {praticagemUpdated}
                   </span>
                 )}
                 <button
                   type="button"
                   onClick={handleSyncPraticagem}
                   disabled={syncing}
-                  className="px-3 py-1.5 bg-[#eef7f8] hover:bg-[#dff0f2] text-[#126f7f] border border-[#d0e6ea] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="px-3.5 py-2 bg-[#eef7f8] hover:bg-[#dff0f2] text-[#126f7f] border border-[#d0e6ea] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 shrink-0 shadow-xs cursor-pointer"
                   title="Atualizar dados diretamente do site da Praticagem RJ"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
-                  {syncing ? "Sincronizando..." : "Sincronizar Praticagem RJ"}
+                  <span>{syncing ? "Sincronizando..." : "Sincronizar Praticagem RJ"}</span>
                 </button>
               </div>
+            </div>
+
+            {/* Toolbar Row 2: Filter chips */}
+            <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+              <span className="text-[11px] font-semibold text-[#6e828a] uppercase tracking-wider flex items-center gap-1 mr-1">
+                <Filter className="w-3 h-3 text-[#16869a]" /> Berço:
+              </span>
+              <button
+                type="button"
+                onClick={() => setPraticagemFilter("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 cursor-pointer ${
+                  praticagemFilter === "all"
+                    ? "bg-[#102d40] text-white border-[#102d40] shadow-sm"
+                    : "bg-white text-[#526871] border-[#d8e2e5] hover:bg-[#f6f9fa]"
+                }`}
+                style={praticagemFilter === "all" ? { color: "#ffffff" } : {}}
+              >
+                Todos do Terminal ({liveManeuvers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPraticagemFilter("prolong")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 cursor-pointer ${
+                  praticagemFilter === "prolong"
+                    ? "bg-[#102d40] text-white border-[#102d40] shadow-sm"
+                    : "bg-white text-[#526871] border-[#d8e2e5] hover:bg-[#f6f9fa]"
+                }`}
+                style={praticagemFilter === "prolong" ? { color: "#ffffff" } : {}}
+              >
+                Prolongamento ({liveManeuvers.filter((m) => (m.berthTo || "").toUpperCase().includes("PROLONG")).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPraticagemFilter("tecon1")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 cursor-pointer ${
+                  praticagemFilter === "tecon1"
+                    ? "bg-[#102d40] text-white border-[#102d40] shadow-sm"
+                    : "bg-white text-[#526871] border-[#d8e2e5] hover:bg-[#f6f9fa]"
+                }`}
+                style={praticagemFilter === "tecon1" ? { color: "#ffffff" } : {}}
+              >
+                Tecon 1 ({liveManeuvers.filter((m) => (m.berthTo || "").toUpperCase().includes("TECONT1")).length})
+              </button>
             </div>
 
             {/* List Table / Cards */}
@@ -522,15 +530,15 @@ export default function AddVesselModal({
                   return (
                     <div
                       key={`${m.name}-${m.dateTime}-${idx}`}
-                      className="p-3.5 hover:bg-[#f7fafb] transition-colors flex items-center justify-between gap-4"
+                      className="p-4 hover:bg-[#f7fafb] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
                     >
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-[#ebf3f5] text-[#1a445d] flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5 border border-[#d6e4e8]">
-                          <Ship className="w-4 h-4 text-[#16869a]" />
+                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-lg bg-[#eef6f8] text-[#16869a] flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5 border border-[#d3e5ea]">
+                          <Ship className="w-5 h-5 text-[#16869a]" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-[#102d40] text-sm tracking-tight truncate">
+                            <span className="font-bold text-[#102d40] text-base tracking-tight">
                               {m.name}
                             </span>
                             {/* Maneuver badge */}
@@ -547,32 +555,32 @@ export default function AddVesselModal({
                             </span>
 
                             {/* Berth badge */}
-                            <span className="bg-[#f0f4f7] text-[#2c4c5a] border border-[#d8e2e6] text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <Anchor className="w-2.5 h-2.5 text-[#16869a]" />
+                            <span className="bg-[#eef5f8] text-[#18465a] border border-[#cbdee5] text-[11px] font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
+                              <Anchor className="w-3 h-3 text-[#16869a]" />
                               {berthDisplay}
                             </span>
 
                             {/* Date/time badge */}
-                            <span className="text-[11px] text-[#637780] font-medium flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-gray-400" />
+                            <span className="text-[11px] text-[#556b75] font-semibold flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-[#8799a1]" />
                               {m.dateTime}
                             </span>
                           </div>
 
                           {/* Technical measurements */}
-                          <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[#556972] flex-wrap">
-                            <span className="font-semibold text-[#1f3c49]">
-                              LOA: <span className="font-bold text-[#16869a]">{m.loa ? `${m.loa.toFixed(1)} m` : "—"}</span>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-[#556972] flex-wrap">
+                            <span className="font-medium text-[#1f3c49]">
+                              LOA: <strong className="text-[#16869a] font-bold">{m.loa ? `${m.loa.toFixed(1)} m` : "—"}</strong>
                             </span>
-                            <span>·</span>
+                            <span className="text-gray-300">·</span>
                             <span>
-                              Boca: <strong>{m.beam ? `${m.beam.toFixed(1)} m` : "—"}</strong>
+                              Boca: <strong className="text-[#203a46]">{m.beam ? `${m.beam.toFixed(1)} m` : "—"}</strong>
                             </span>
-                            <span>·</span>
+                            <span className="text-gray-300">·</span>
                             <span>
-                              Calado: <strong>{m.draft ? `${m.draft.toFixed(1)} m` : "—"}</strong>
+                              Calado: <strong className="text-[#203a46]">{m.draft ? `${m.draft.toFixed(1)} m` : "—"}</strong>
                             </span>
-                            <span>·</span>
+                            <span className="text-gray-300">·</span>
                             <span>
                               Bordo:{" "}
                               <strong className={m.berthingSide === "boreste" ? "text-amber-700" : "text-blue-700"}>
@@ -581,37 +589,38 @@ export default function AddVesselModal({
                             </span>
                             {m.imo && (
                               <>
-                                <span>·</span>
+                                <span className="text-gray-300">·</span>
                                 <span className="text-[#7c8f96]">IMO: {m.imo}</span>
                               </>
                             )}
                             {m.type && (
                               <>
-                                <span>·</span>
-                                <span className="text-[#7c8f96] truncate max-w-[150px]">{m.type}</span>
+                                <span className="text-gray-300">·</span>
+                                <span className="text-[#7c8f96] truncate max-w-[180px]">{m.type}</span>
                               </>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Add Button */}
+                      {/* Add Button with high-contrast bright white text */}
                       <button
                         type="button"
                         onClick={() => handleAddFromPraticagem(m)}
-                        className="px-3.5 py-1.5 bg-[#102d40] hover:bg-[#19415a] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition-all flex-shrink-0 active:scale-95"
+                        className="px-4 py-2 bg-[#16869a] hover:bg-[#126f7f] rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all flex-shrink-0 active:scale-95 cursor-pointer font-bold text-xs"
+                        style={{ color: "#ffffff", backgroundColor: "#16869a" }}
                       >
-                        <Plus className="w-3.5 h-3.5 text-cyan-300" />
-                        <span>Adicionar ao Cenário</span>
+                        <Plus className="w-4 h-4 text-white" />
+                        <span style={{ color: "#ffffff" }}>Adicionar ao Cenário</span>
                       </button>
                     </div>
                   );
                 })
               )}
             </div>
-            <div className="mt-2 text-[10px] text-[#71858e] flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-[#16869a]" />
-              Ao adicionar uma embarcação da Praticagem RJ, seus dados técnicos ficam automaticamente gravados no catálogo permanente para futuras simulações.
+            <div className="mt-2.5 text-[10px] text-[#71858e] flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#16869a] flex-shrink-0" />
+              <span>Ao adicionar uma embarcação da Praticagem RJ, seus dados técnicos ficam automaticamente gravados no catálogo permanente para futuras simulações.</span>
             </div>
           </div>
         )}
@@ -754,10 +763,11 @@ export default function AddVesselModal({
                       <button
                         type="button"
                         onClick={() => handleAddFromCatalog(v)}
-                        className="px-3.5 py-1.5 bg-[#102d40] hover:bg-[#19415a] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                        className="px-4 py-2 bg-[#16869a] hover:bg-[#126f7f] rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all flex-shrink-0 active:scale-95 cursor-pointer font-bold text-xs"
+                        style={{ color: "#ffffff", backgroundColor: "#16869a" }}
                       >
-                        <Plus className="w-3.5 h-3.5 text-cyan-300" />
-                        <span>Adicionar ao Cenário</span>
+                        <Plus className="w-4 h-4 text-white" />
+                        <span style={{ color: "#ffffff" }}>Adicionar ao Cenário</span>
                       </button>
                     </div>
                   </div>
@@ -903,10 +913,11 @@ export default function AddVesselModal({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#102d40] hover:bg-[#19415a] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2.5 bg-[#16869a] hover:bg-[#126f7f] rounded-lg flex items-center gap-2 shadow-sm cursor-pointer font-bold text-xs"
+                  style={{ color: "#ffffff", backgroundColor: "#16869a" }}
                 >
-                  <Plus className="w-4 h-4 text-cyan-300" />
-                  <span>Adicionar ao Cenário</span>
+                  <Plus className="w-4 h-4 text-white" />
+                  <span style={{ color: "#ffffff" }}>Adicionar ao Cenário</span>
                 </button>
               </div>
             </div>
