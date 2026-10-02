@@ -7,6 +7,7 @@ import {
   ZoomOut,
   RotateCcw,
   Share2,
+  Download,
 } from "lucide-react";
 import BerthBlueprint from "@/components/berth-blueprint";
 import { type Scenario } from "@/lib/berth-model";
@@ -40,6 +41,7 @@ export default function BerthViewModal({
   const [isMaximized, setIsMaximized] = useState(true); // Abre em tela cheia
   const [zoom, setZoom] = useState(2.04); // Padrão 204% conforme solicitado
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   async function handleShare() {
@@ -49,8 +51,21 @@ export default function BerthViewModal({
       containerElement: containerRef.current,
       scenarioName: scenario.name,
       vesselName,
+      downloadOnly: false,
     });
     setIsExporting(false);
+  }
+
+  async function handleDownload() {
+    setIsDownloading(true);
+    const vesselName = scenario.vessels.map((v) => v.name).filter(Boolean).join(" - ");
+    await exportAndShareBerthImage({
+      containerElement: containerRef.current,
+      scenarioName: scenario.name,
+      vesselName,
+      downloadOnly: true,
+    });
+    setIsDownloading(false);
   }
 
   // Calcula o zoom para preencher largura da janela quando o usuário desejar
@@ -96,7 +111,7 @@ export default function BerthViewModal({
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
             <span className="text-sm sm:text-base font-bold text-white tracking-tight">
-              Vista da Atracação
+              View Atracação
             </span>
             <span className="text-[11px] font-medium text-slate-400 hidden md:inline">
               · {scenario.name} ({scenario.vessels.length} navio{scenario.vessels.length === 1 ? "" : "s"} atracado{scenario.vessels.length === 1 ? "" : "s"})
@@ -140,11 +155,23 @@ export default function BerthViewModal({
               </button>
             </div>
 
+            {/* Botão Salvar Imagem Diretamente no PC */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading || isExporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white border border-slate-600/90 font-bold rounded-lg text-xs shadow-sm transition disabled:opacity-50 select-none cursor-pointer"
+              title="Baixar imagem do cais em alta definição diretamente no seu PC"
+            >
+              <Download size={14} className="text-cyan-400" />
+              <span>{isDownloading ? "Salvando..." : "Salvar no PC"}</span>
+            </button>
+
             {/* Botão Compartilhar Imagem em Alta Definição para WhatsApp */}
             <button
               type="button"
               onClick={handleShare}
-              disabled={isExporting}
+              disabled={isDownloading || isExporting}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-lg text-xs shadow-sm transition disabled:opacity-50 select-none cursor-pointer"
               title="Salvar e compartilhar imagem em alta definição para WhatsApp"
             >

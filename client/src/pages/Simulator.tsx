@@ -8,7 +8,6 @@ import {
   Plus,
   Radio,
   Ruler,
-  Save,
   Settings,
   Ship,
   Trash2,
@@ -32,7 +31,6 @@ import {
 import BerthBlueprint from "@/components/berth-blueprint";
 import AddVesselModal from "@/components/AddVesselModal";
 import BerthViewModal from "@/components/BerthViewModal";
-import { saveVesselToCatalog } from "@/lib/vessel-catalog";
 import {
   calculateIssues,
   createBollardInventory,
@@ -252,8 +250,27 @@ export default function Simulator() {
     const line: MooringLine = { id: makeId("cabo"), type, shipOffset: vessel ? defaultMooringOffset(type, vessel.loa) : null, bollardId: null };
     setScenario((current) => ({
       ...current,
-      vessels: current.vessels.map((vessel) => vessel.id === vesselId ? { ...vessel, mooringLines: [...vessel.mooringLines, line] } : vessel),
+      vessels: current.vessels.map((vessel) => vessel.id === vesselId ? { ...vessel, mooringLines: [line, ...vessel.mooringLines] } : vessel),
     }));
+  }
+
+  function addMooringKit(vesselId: string) {
+    const vessel = scenario.vessels.find((item) => item.id === vesselId);
+    if (!vessel) return;
+    const types: MooringLineType[] = ["lancante-proa", "spring-proa", "spring-popa", "lancante-popa"];
+    const newLines: MooringLine[] = types.map((type) => ({
+      id: makeId("cabo"),
+      type,
+      shipOffset: defaultMooringOffset(type, vessel.loa),
+      bollardId: null,
+    }));
+    setScenario((current) => ({
+      ...current,
+      vessels: current.vessels.map((v) =>
+        v.id === vesselId ? { ...v, mooringLines: [...newLines, ...v.mooringLines] } : v
+      ),
+    }));
+    setNotice(`4 cabos adicionados (Popa + Proa) ao navio "${vessel.name}".`);
   }
 
   function patchMooringLine(vesselId: string, lineId: string, patch: Partial<MooringLine>) {
@@ -490,9 +507,9 @@ export default function Simulator() {
             className="button button-quiet text-[#0284c7] hover:text-[#0369a1] hover:bg-sky-50 border border-sky-200/90 shadow-xs font-semibold"
             type="button"
             onClick={() => setIsBerthViewModalOpen(true)}
-            title="Abrir visualização operacional da atracação em janela ampliada ou maximizada com dados do navio e cabeços"
+            title="Abrir View Atracação em janela ampliada ou maximizada com dados do navio e cabeços"
           >
-            <Maximize2 size={14} className="text-[#0284c7]" /> <span>Vista da Atracação</span>
+            <Maximize2 size={14} className="text-[#0284c7]" /> <span>View Atracação</span>
           </button>
           <input ref={importRef} type="file" accept="application/json,.json" className="visually-hidden" onChange={(event) => void importScenario(event.target.files?.[0])} />
         </div>
@@ -669,42 +686,7 @@ export default function Simulator() {
                   <button type="button" className="icon-button delete-vessel" title="Remover navio" aria-label="Remover navio" onClick={() => removeVessel(selectedVessel.id)}><Trash2 size={16} /></button>
                 </div>
                 <label className="field-label" htmlFor="vessel-name">Nome do navio</label>
-                <div className="flex gap-2 items-center">
-                  <input id="vessel-name" className="text-input flex-1" value={selectedVessel.name} onChange={(event) => patchVessel(selectedVessel.id, { name: event.target.value })} placeholder="Ex.: Navio Alvorada" maxLength={54} />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await saveVesselToCatalog({
-                        name: selectedVessel.name,
-                        loa: selectedVessel.loa,
-                        beam: selectedVessel.beam,
-                        draft: selectedVessel.draft,
-                        berthingSide: selectedVessel.berthingSide,
-                        type: VESSEL_TYPE_LABELS[selectedVessel.vesselType ?? "container"],
-                      });
-                      setNotice(`Navio "${selectedVessel.name}" (${VESSEL_TYPE_LABELS[selectedVessel.vesselType ?? "container"]}) gravado em Navios Salvos.`);
-                    }}
-                    className="button button-quiet text-[10px] px-2 h-[34px] text-[#16869a]"
-                    title="Gravar este navio na lista de Navios Salvos para futuras simulações"
-                  >
-                    <Save size={13} /> Gravar em Navios Salvos
-                  </button>
-                </div>
-
-                <div className="berthing-side-field mt-3 mb-2">
-                  <label className="field-label" htmlFor="vessel-type-select">Tipo de embarcação (Planta Blueprint)</label>
-                  <select
-                    id="vessel-type-select"
-                    className="side-select"
-                    value={selectedVessel.vesselType ?? "container"}
-                    onChange={(event) => patchVessel(selectedVessel.id, { vesselType: event.target.value as VesselType })}
-                  >
-                    <option value="container">Porta-Contêineres (Container Ship)</option>
-                    <option value="general-cargo">Carga Geral / Graneleiro (General Cargo Ship)</option>
-                    <option value="tanker">Petroleiro / Químico (Chemical/Products Tanker)</option>
-                  </select>
-                  <p className="form-hint">Alterna a planta blueprint do convés (baías de contêineres, escotilhas e guindastes, ou manifold e tubulações).</p>
-                </div>
+                <input id="vessel-name" className="text-input" value={selectedVessel.name} onChange={(event) => patchVessel(selectedVessel.id, { name: event.target.value })} placeholder="Ex.: Navio Alvorada" maxLength={54} />
 
                 <div className="field-row">
                   <div>
@@ -752,7 +734,14 @@ export default function Simulator() {
                 <section className="mooring-editor" aria-label="Amarrações do navio">
                   <div className="mooring-editor-heading">
                     <div><span className="section-kicker">CONEXÕES VISUAIS</span><h4>Lançantes e springs</h4></div>
-                    <button className="button button-add mooring-add-button" type="button" onClick={() => addMooringLine(selectedVessel.id)}><Plus size={14} /> Cabo</button>
+                    <button
+                      className="button button-add mooring-add-button"
+                      type="button"
+                      title="Adicionar conjunto padrão (1 spring e 1 lançante na proa + 1 spring e 1 lançante na popa)"
+                      onClick={() => addMooringKit(selectedVessel.id)}
+                    >
+                      <Sparkles size={14} /> Cabos Popa + Proa
+                    </button>
                   </div>
                   <p className="form-hint">Os pontos iniciais são ilustrativos: proa a 90% e popa a 10% do LOA. Ajuste pela planta (proa: 70–100%; popa: 0–30% medidos desde a popa) e arraste a ponta amarela até o cabeço. As posições esquemáticas dos cabeços não são coordenadas reais.</p>
                   {selectedVessel.mooringLines.length === 0 && <div className="mooring-empty">Nenhuma linha cadastrada para este navio.</div>}
@@ -814,10 +803,74 @@ export default function Simulator() {
           <p><strong>* Leitura do requisito mínimo:</strong> soma dos LOAs mais o afastamento configurado nas duas bordas do cais e entre navios. Cabeços, cabos e escada são mostrados a partir das posições inseridas; o app não calcula tensão, ângulo admissível, capacidade dos cabeços, passarela segura ou autoriza a operação. <a href="/arquitetura-e-limites.md" target="_blank" rel="noreferrer">Consulte arquitetura, premissas e limites.</a></p>
         </section>
 
-        <footer className="page-footer">
-          <span><span className="footer-dot" /> Modo operacional</span>
-          <span>Simulador de atracação integrado com Praticagem RJ e catálogo permanente de navios.</span>
-          <button type="button" onClick={restoreDemo}>Restaurar dados de exemplo</button>
+        <footer className="page-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", padding: "14px 0", borderTop: "1px solid #e2e8ea", marginTop: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600, color: "#48626c" }}>
+              <span className="footer-dot" /> Modo operacional
+            </span>
+            <span style={{ color: "#94a3a8" }}>•</span>
+            <span style={{ color: "#64748b" }}>Simulador de atracação portuária</span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <span style={{ color: "#475569", fontWeight: 500, fontSize: "11px" }}>
+              Desenvolvido por <strong style={{ color: "#16869a", fontWeight: 700 }}>Dalmo dos Santos Cabral</strong>
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <a
+                href="https://www.linkedin.com/in/dalmo-cabral-062374131/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="LinkedIn de Dalmo dos Santos Cabral"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  backgroundColor: "#0a66c2",
+                  color: "#ffffff",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  transition: "opacity 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                </svg>
+                LinkedIn
+              </a>
+              <a
+                href="https://github.com/Dalmocabral"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="GitHub de Dalmo dos Santos Cabral"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  backgroundColor: "#24292f",
+                  color: "#ffffff",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  transition: "opacity 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                </svg>
+                GitHub
+              </a>
+            </div>
+          </div>
         </footer>
         <div className="live-notice" aria-live="polite">{notice}</div>
 

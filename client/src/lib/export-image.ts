@@ -4,10 +4,12 @@ export async function exportAndShareBerthImage({
   containerElement,
   scenarioName,
   vesselName,
+  downloadOnly = false,
 }: {
   containerElement: HTMLElement | null;
   scenarioName: string;
   vesselName?: string;
+  downloadOnly?: boolean;
 }): Promise<boolean> {
   if (!containerElement) {
     toast.error("Visualizador do cais não encontrado para exportação.");
@@ -102,9 +104,9 @@ export async function exportAndShareBerthImage({
           const fileName = `atracacao-${safeName}.png`;
           const file = new File([blob], fileName, { type: "image/png" });
 
-          // Tentar compartilhar nativamente pelo sistema (se o usuário estiver no WhatsApp ou mobile/Windows)
+          // Tentar compartilhar nativamente pelo sistema (se o usuário estiver no WhatsApp ou mobile/Windows e NÃO for download direto)
           let sharedNatively = false;
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          if (!downloadOnly && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
               await navigator.share({
                 files: [file],
@@ -119,8 +121,8 @@ export async function exportAndShareBerthImage({
             }
           }
 
-          // Se não compartilhou via janela nativa, faz o download automático do PNG
-          if (!sharedNatively) {
+          // Se for downloadOnly ou não compartilhou via janela nativa, faz o download automático do PNG no PC
+          if (downloadOnly || !sharedNatively) {
             const downloadUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = downloadUrl;
@@ -131,7 +133,7 @@ export async function exportAndShareBerthImage({
             URL.revokeObjectURL(downloadUrl);
           }
 
-          // Copiar para a área de transferência para colar diretamente com Ctrl + V no WhatsApp Web
+          // Copiar para a área de transferência para colar diretamente com Ctrl + V no WhatsApp Web ou outros apps
           let copiedToClipboard = false;
           try {
             if (navigator.clipboard && window.ClipboardItem) {
@@ -146,7 +148,9 @@ export async function exportAndShareBerthImage({
             console.warn("Clipboard write:", clipErr);
           }
 
-          if (sharedNatively) {
+          if (downloadOnly) {
+            toast.success("Imagem em alta definição salva com sucesso no seu computador!");
+          } else if (sharedNatively) {
             toast.success("Plano compartilhado com sucesso!");
           } else if (copiedToClipboard) {
             toast.success("Imagem em alta definição baixada e copiada! Cole (Ctrl+V) direto no WhatsApp.");

@@ -4,6 +4,7 @@ import {
   ZoomOut,
   ArrowLeft,
   Share2,
+  Download,
 } from "lucide-react";
 import BerthBlueprint from "@/components/berth-blueprint";
 import {
@@ -17,10 +18,11 @@ export default function BerthStandaloneView() {
   const [scenario, setScenario] = useState<Scenario>(() => readScenario());
   const [zoom, setZoom] = useState(2.04);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   async function handleShare() {
-    if (isExporting) return;
+    if (isExporting || isDownloading) return;
     setIsExporting(true);
     try {
       const primaryVessel = scenario.vessels[0]?.name;
@@ -28,9 +30,26 @@ export default function BerthStandaloneView() {
         containerElement: containerRef.current,
         scenarioName: scenario.name,
         vesselName: primaryVessel,
+        downloadOnly: false,
       });
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function handleDownload() {
+    if (isExporting || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const primaryVessel = scenario.vessels[0]?.name;
+      await exportAndShareBerthImage({
+        containerElement: containerRef.current,
+        scenarioName: scenario.name,
+        vesselName: primaryVessel,
+        downloadOnly: true,
+      });
+    } finally {
+      setIsDownloading(false);
     }
   }
 
@@ -76,7 +95,7 @@ export default function BerthStandaloneView() {
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
           </span>
           <h1 className="text-base font-bold text-white flex items-center gap-2">
-            <span>Vista da Atracação</span>
+            <span>View Atracação</span>
             <span className="text-xs font-normal text-slate-400">· {scenario.name}</span>
           </h1>
         </div>
@@ -117,11 +136,23 @@ export default function BerthStandaloneView() {
             </button>
           </div>
 
+          {/* Botão Salvar Imagem Diretamente no PC */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isDownloading || isExporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white border border-slate-600/90 font-bold rounded-lg text-xs shadow-sm transition disabled:opacity-50 select-none cursor-pointer"
+            title="Baixar imagem do cais em alta definição diretamente no seu PC"
+          >
+            <Download size={14} className="text-cyan-400" />
+            <span>{isDownloading ? "Salvando..." : "Salvar no PC"}</span>
+          </button>
+
           {/* Botão Compartilhar Imagem em Alta Definição para WhatsApp */}
           <button
             type="button"
             onClick={handleShare}
-            disabled={isExporting}
+            disabled={isDownloading || isExporting}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-slate-950 font-bold rounded-lg text-xs shadow-sm transition disabled:opacity-50 select-none cursor-pointer"
             title="Salvar e compartilhar imagem em alta definição para WhatsApp"
           >
