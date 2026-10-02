@@ -1,0 +1,6 @@
+{
+  "routes": [
+    { "path": "/", "title": "Simulador de atracação" },
+    { "path": "/404", "title": "Página não encontrada" }
+  ]
+}

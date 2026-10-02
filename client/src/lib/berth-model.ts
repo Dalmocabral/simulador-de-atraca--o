@@ -1,0 +1,452 @@
+export type VesselColor = "blue" | "teal" | "orange" | "violet";
+export type BerthingSide = "bombordo" | "boreste";
+export type MooringLineType = "lancante-proa" | "spring-proa" | "spring-popa" | "lancante-popa";
+
+export const MOORING_LINE_LABELS: Record<MooringLineType, string> = {
+  "lancante-proa": "Lançante de proa",
+  "spring-proa": "Spring de proa",
+  "spring-popa": "Spring de popa",
+  "lancante-popa": "Lançante de popa",
+};
+
+export interface BerthSegment {
+  id: string;
+  name: string;
+  length: number;
+}
+
+export type BollardType = "duplo" | "alto-antigo" | "alto-novo" | "baixo-antigo" | "avariado";
+
+export const BOLLARD_TYPES: Record<BollardType, { label: string; color: string; border: string; image: string }> = {
+  "duplo": { label: "Cabeço duplo", color: "#3a7ebf", border: "#225a8d", image: "/bollards/cabeco-duplo.png" },
+  "alto-antigo": { label: "Cabeço alto antigo", color: "#3d4529", border: "#252b17", image: "/bollards/cabeco-alto-antigo.jpg" },
+  "alto-novo": { label: "Cabeço alto novo", color: "#6c757d", border: "#495057", image: "/bollards/cabeco-alto-novo.jpg" },
+  "baixo-antigo": { label: "Cabeço baixo antigo", color: "#e67e22", border: "#b85d10", image: "/bollards/cabeco-baixo-antigo.png" },
+  "avariado": { label: "Cabeço avariado", color: "#d62828", border: "#9e1515", image: "/bollards/cabeco-duplo.png" },
+};
+
+export interface Bollard {
+  id: string;
+  /** Metros desde o início do cais; null significa posição ainda não cadastrada. */
+  position: number | null;
+  type?: BollardType;
+}
+
+export interface MooringLine {
+  id: string;
+  type: MooringLineType;
+  /** Ponto do navio medido desde a popa; null enquanto não informado. */
+  shipOffset: number | null;
+  bollardId: string | null;
+}
+
+export interface Vessel {
+  id: string;
+  name: string;
+  loa: number;
+  beam: number;
+  draft: number;
+  position: number;
+  /** Lado do navio voltado para o cais; a vista superior espelha a proa conforme a escolha. */
+  berthingSide: BerthingSide;
+  /** Posição do eixo/ponto central da escada medida a partir da popa. */
+  gangwayOffset: number;
+  mooringLines: MooringLine[];
+  color: VesselColor;
+}
+
+export interface Scenario {
+  name: string;
+  clearance: number;
+  segments: BerthSegment[];
+  vessels: Vessel[];
+  bollards: Bollard[];
+}
+
+export interface BerthIssue {
+  vesselId: string;
+  kind: "edge" | "spacing" | "overlap";
+  message: string;
+}
+
+export const STORAGE_KEY = "caislab:scenario:v4";
+
+export const VESSEL_COLORS: Record<VesselColor, { label: string; fill: string; stroke: string; accent: string }> = {
+  blue: { label: "Azul", fill: "#3f779b", stroke: "#285a78", accent: "#b9dce9" },
+  teal: { label: "Petróleo", fill: "#2f8b89", stroke: "#216c6b", accent: "#b8e5dc" },
+  orange: { label: "Âmbar", fill: "#d17a3d", stroke: "#a85a2b", accent: "#f3d2b5" },
+  violet: { label: "Violeta", fill: "#7769a5", stroke: "#594e83", accent: "#d5ceed" },
+};
+
+export const CONTAINER_COLORS = ["#d8e7e7", "#bdd8dd", "#e5c5a4", "#b7c7d0", "#c8d1ae", "#f0dfb5"];
+
+const MOORING_TYPES = Object.keys(MOORING_LINE_LABELS) as MooringLineType[];
+
+export function defaultMooringOffset(type: MooringLineType, loa: number) {
+  return loa * (type.endsWith("proa") ? 0.9 : 0.1);
+}
+
+export function mooringOffsetLimits(type: MooringLineType, loa: number) {
+  return type.endsWith("proa")
+    ? { min: loa * 0.7, max: loa }
+    : { min: 0, max: loa * 0.3 };
+}
+
+/** Keeps bow cables in the forward third and stern cables in the aft third. */
+export function normalizeMooringOffset(type: MooringLineType, loa: number, offset: number | null) {
+  const limits = mooringOffsetLimits(type, loa);
+  if (offset === null || !Number.isFinite(offset) || offset < limits.min || offset > limits.max) {
+    return defaultMooringOffset(type, loa);
+  }
+  return offset;
+}
+
+/** Position from the left endpoint of the berth view, given a station from the stern. */
+export function berthwiseOffsetFromStern(loa: number, side: BerthingSide, offsetFromStern: number) {
+  return side === "bombordo" ? loa - offsetFromStern : offsetFromStern;
+}
+
+export function makeId(prefix: string) {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36).slice(-4)}`;
+}
+
+export const DEFAULT_BOLLARD_CONFIG: { id: string; distanceToNext: number; type: BollardType }[] = [
+  { id: "309", distanceToNext: 19.8, type: "duplo" },
+  { id: "308", distanceToNext: 19.8, type: "duplo" },
+  { id: "307", distanceToNext: 19.8, type: "duplo" },
+  { id: "306", distanceToNext: 19.8, type: "duplo" },
+  { id: "305", distanceToNext: 10.7, type: "duplo" },
+  { id: "304", distanceToNext: 25.0, type: "duplo" },
+  { id: "303", distanceToNext: 25.0, type: "duplo" },
+  { id: "302", distanceToNext: 25.0, type: "duplo" },
+  { id: "301", distanceToNext: 25.0, type: "duplo" },
+  { id: "300", distanceToNext: 25.0, type: "duplo" },
+  { id: "299", distanceToNext: 25.0, type: "duplo" },
+  { id: "298", distanceToNext: 25.0, type: "duplo" },
+  { id: "297", distanceToNext: 30.0, type: "duplo" },
+  { id: "296", distanceToNext: 26.0, type: "alto-novo" },
+  { id: "295", distanceToNext: 30.0, type: "alto-novo" },
+  { id: "294", distanceToNext: 26.0, type: "alto-novo" },
+  { id: "293", distanceToNext: 30.0, type: "alto-novo" },
+  { id: "292", distanceToNext: 25.0, type: "alto-novo" },
+  { id: "291", distanceToNext: 30.0, type: "alto-novo" },
+  { id: "290", distanceToNext: 26.0, type: "alto-novo" },
+  { id: "289", distanceToNext: 30.0, type: "baixo-antigo" },
+  { id: "288", distanceToNext: 38.0, type: "baixo-antigo" },
+  { id: "287", distanceToNext: 25.5, type: "baixo-antigo" },
+  { id: "286", distanceToNext: 25.0, type: "baixo-antigo" },
+  { id: "285", distanceToNext: 26.0, type: "baixo-antigo" },
+  { id: "284", distanceToNext: 25.0, type: "baixo-antigo" },
+  { id: "283", distanceToNext: 25.0, type: "baixo-antigo" },
+  { id: "282", distanceToNext: 26.0, type: "alto-novo" },
+  { id: "281", distanceToNext: 25.5, type: "alto-novo" },
+  { id: "280", distanceToNext: 25.5, type: "alto-novo" },
+  { id: "279", distanceToNext: 25.5, type: "alto-novo" },
+  { id: "278", distanceToNext: 26.5, type: "baixo-antigo" },
+  { id: "277", distanceToNext: 0, type: "alto-antigo" },
+];
+
+export function createBollardInventory(): Bollard[] {
+  let currentPos = 12.0;
+  return DEFAULT_BOLLARD_CONFIG.map((item) => {
+    const bollard: Bollard = {
+      id: item.id,
+      position: Number(currentPos.toFixed(1)),
+      type: item.type,
+    };
+    currentPos += item.distanceToNext;
+    return bollard;
+  });
+}
+
+export interface BollardDisplayPosition {
+  id: string;
+  position: number;
+  estimated: boolean;
+  type?: BollardType;
+}
+
+/** Unpositioned bollards get schematic display slots only; their saved position remains null. */
+export function bollardDisplayPositions(bollards: Bollard[], quayLength: number): BollardDisplayPosition[] {
+  if (!Number.isFinite(quayLength) || quayLength <= 0) return [];
+  const lastIndex = Math.max(1, bollards.length - 1);
+  const positions: BollardDisplayPosition[] = [];
+  bollards.forEach((bollard, index) => {
+    if (bollard.position !== null) {
+      if (bollard.position <= quayLength) positions.push({ id: bollard.id, position: bollard.position, estimated: false, type: bollard.type });
+      return;
+    }
+    positions.push({
+      id: bollard.id,
+      position: bollards.length <= 1 ? quayLength / 2 : (index / lastIndex) * quayLength,
+      estimated: true,
+      type: bollard.type,
+    });
+  });
+  return positions;
+}
+
+function splitDelimitedRow(row: string, delimiter: string) {
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < row.length; index += 1) {
+    const character = row[index];
+    if (character === '"' && quoted && row[index + 1] === '"') {
+      cell += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === delimiter && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+export function serializeBollardCsv(bollards: Bollard[]) {
+  const quote = (value: string) => /[;"\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const rows = ["identificador;posicao_m", ...bollards.map((bollard) => `${quote(bollard.id)};${bollard.position === null ? "" : bollard.position.toLocaleString("pt-BR", { useGrouping: false, maximumFractionDigits: 1 })}`)];
+  return `\uFEFF${rows.join("\r\n")}`;
+}
+
+export function parseBollardCsv(content: string, quayLength: number): Bollard[] {
+  const rows = content.replace(/^\uFEFF/, "").split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+  if (rows.length === 0) return [];
+  const delimiter = rows[0].includes(";") ? ";" : rows[0].includes("\t") ? "\t" : ",";
+  const updates: Bollard[] = [];
+  for (const [index, row] of rows.entries()) {
+    const [id = "", rawPosition = ""] = splitDelimitedRow(row, delimiter);
+    if (index === 0 && /identificador|cabe[cç]o|^id$/i.test(id) && /posi[cç]|metro|station/i.test(rawPosition)) continue;
+    if (!rawPosition) continue;
+    if (!id) throw new Error(`Linha ${index + 1}: informe o identificador do cabeço.`);
+    const position = Number(rawPosition.replace(",", "."));
+    if (!Number.isFinite(position) || position < 0 || position > quayLength) {
+      const max = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(quayLength);
+      throw new Error(`Linha ${index + 1}: a posição precisa estar entre 0 e ${max} m.`);
+    }
+    updates.push({ id, position });
+  }
+  if (new Set(updates.map((item) => item.id)).size !== updates.length) throw new Error("O CSV contém identificadores de cabeço repetidos.");
+  return updates;
+}
+
+export function createDemoScenario(): Scenario {
+  return {
+    name: "Cenário de referência",
+    clearance: 15,
+    segments: [
+      { id: "segment-expansao", name: "Expansão", length: 85 },
+      { id: "segment-prolongamento", name: "Prolongamento", length: 430 },
+      { id: "segment-tecon", name: "Tecon 1", length: 385 },
+    ],
+    vessels: [
+      {
+        id: "vessel-cosco",
+        name: "Cosco Shipping Chile",
+        loa: 336,
+        beam: 45,
+        draft: 13.8,
+        position: 100,
+        berthingSide: "boreste",
+        gangwayOffset: 168,
+        mooringLines: [],
+        color: "blue",
+      },
+      {
+        id: "vessel-vermilion",
+        name: "Navios Vermilion",
+        loa: 260,
+        beam: 32,
+        draft: 11.5,
+        position: 560,
+        berthingSide: "boreste",
+        gangwayOffset: 130,
+        mooringLines: [],
+        color: "orange",
+      },
+    ],
+    bollards: createBollardInventory(),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMooringLineType(value: unknown): value is MooringLineType {
+  return typeof value === "string" && MOORING_TYPES.includes(value as MooringLineType);
+}
+
+/** Normaliza cenários novos e versões antigas, que não tinham cabeços nem escada. */
+export function normalizeScenario(value: unknown): Scenario | null {
+  if (!isRecord(value) || typeof value.name !== "string" || !Array.isArray(value.segments) || !Array.isArray(value.vessels)) return null;
+  if (typeof value.clearance !== "number" || !Number.isFinite(value.clearance)) return null;
+
+  const segments: BerthSegment[] = [];
+  for (const [index, raw] of value.segments.entries()) {
+    if (!isRecord(raw) || typeof raw.name !== "string" || typeof raw.length !== "number" || !Number.isFinite(raw.length)) return null;
+    segments.push({ id: typeof raw.id === "string" && raw.id ? raw.id : makeId("trecho"), name: raw.name, length: Math.max(1, raw.length) });
+  }
+
+  const vessels: Vessel[] = [];
+  for (const [index, raw] of value.vessels.entries()) {
+    if (!isRecord(raw) || typeof raw.name !== "string" || typeof raw.loa !== "number" || !Number.isFinite(raw.loa) || typeof raw.position !== "number" || !Number.isFinite(raw.position)) return null;
+    const loa = Math.max(1, raw.loa);
+    const rawLines = Array.isArray(raw.mooringLines) ? raw.mooringLines : [];
+    const mooringLines: MooringLine[] = rawLines.flatMap((candidate, lineIndex) => {
+      if (!isRecord(candidate) || !isMooringLineType(candidate.type)) return [];
+      const shipOffset = normalizeMooringOffset(
+        candidate.type,
+        loa,
+        typeof candidate.shipOffset === "number" && Number.isFinite(candidate.shipOffset) ? candidate.shipOffset : null,
+      );
+      return [{
+        id: typeof candidate.id === "string" && candidate.id ? candidate.id : makeId(`cabo-${lineIndex}`),
+        type: candidate.type,
+        shipOffset,
+        bollardId: typeof candidate.bollardId === "string" ? candidate.bollardId : null,
+      }];
+    });
+    const color = typeof raw.color === "string" && Object.prototype.hasOwnProperty.call(VESSEL_COLORS, raw.color)
+      ? raw.color as VesselColor
+      : (["blue", "teal", "orange", "violet"] as VesselColor[])[index % 4];
+    const gangway = typeof raw.gangwayOffset === "number" && Number.isFinite(raw.gangwayOffset) ? raw.gangwayOffset : loa / 2;
+    vessels.push({
+      id: typeof raw.id === "string" && raw.id ? raw.id : makeId("navio"),
+      name: raw.name,
+      loa,
+      beam: typeof raw.beam === "number" && Number.isFinite(raw.beam) ? Math.max(0, raw.beam) : 0,
+      draft: typeof raw.draft === "number" && Number.isFinite(raw.draft) ? Math.max(0, raw.draft) : 0,
+      position: raw.position,
+      berthingSide: raw.berthingSide === "bombordo" || raw.berthingSide === "boreste" ? raw.berthingSide : "boreste",
+      gangwayOffset: Math.min(loa, Math.max(0, gangway)),
+      mooringLines,
+      color,
+    });
+  }
+
+    const has309 = Array.isArray(value.bollards) &&
+      value.bollards.some((b: unknown) => isRecord(b) && b.id === "309");
+    const has277 = Array.isArray(value.bollards) &&
+      value.bollards.some((b: unknown) => isRecord(b) && b.id === "277");
+
+    let bollards: Bollard[];
+    if (!has309 || !has277) {
+      bollards = createBollardInventory();
+    } else {
+      bollards = (value.bollards as unknown[]).flatMap((raw) => {
+        if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id) return [];
+        const position = typeof raw.position === "number" && Number.isFinite(raw.position) && raw.position >= 0 ? raw.position : null;
+        const type = (typeof raw.type === "string" && Object.prototype.hasOwnProperty.call(BOLLARD_TYPES, raw.type))
+          ? (raw.type as BollardType)
+          : undefined;
+        return [{ id: raw.id, position, type }];
+      });
+    }
+
+  return {
+    name: value.name,
+    clearance: Math.max(0, value.clearance),
+    segments,
+    vessels,
+    bollards,
+  };
+}
+
+export function readScenario(): Scenario {
+  if (typeof window === "undefined") return createDemoScenario();
+  try {
+    let raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      raw = window.localStorage.getItem("caislab:scenario:v3") || window.localStorage.getItem("caislab:scenario:v2") || window.localStorage.getItem("caislab:scenario:v1");
+    }
+    if (!raw) return createDemoScenario();
+    const scenario = normalizeScenario(JSON.parse(raw));
+    if (!scenario) return createDemoScenario();
+    // Ensure bollards match the 33 bollards with exact measurements and types from the port plan
+    const b277 = scenario.bollards.find((b) => b.id === "277");
+    const b288 = scenario.bollards.find((b) => b.id === "288");
+    const b289 = scenario.bollards.find((b) => b.id === "289");
+    if (!b277 || !b288 || !b289 || b289.type !== "baixo-antigo" || b277.type !== "alto-antigo" || Math.abs((b277.position ?? 0) - 823.4) > 1.0) {
+      scenario.bollards = createBollardInventory();
+    }
+    return scenario;
+  } catch {
+    return createDemoScenario();
+  }
+}
+
+export function totalQuayLength(segments: BerthSegment[]) {
+  return segments.reduce((sum, segment) => sum + Math.max(0, segment.length || 0), 0);
+}
+
+export function totalShipLength(vessels: Vessel[]) {
+  return vessels.reduce((sum, vessel) => sum + Math.max(0, vessel.loa || 0), 0);
+}
+
+export function minimumRequiredLength(vessels: Vessel[], clearance: number) {
+  if (!vessels.length) return 0;
+  return totalShipLength(vessels) + Math.max(0, clearance) * (vessels.length + 1);
+}
+
+export function remainingLength(segments: BerthSegment[], vessels: Vessel[], clearance: number) {
+  return totalQuayLength(segments) - minimumRequiredLength(vessels, clearance);
+}
+
+export function calculateIssues(scenario: Scenario): BerthIssue[] {
+  const total = totalQuayLength(scenario.segments);
+  const margin = Math.max(0, scenario.clearance);
+  const issues: BerthIssue[] = [];
+  const ordered = [...scenario.vessels].sort((a, b) => a.position - b.position);
+
+  for (const vessel of ordered) {
+    if (vessel.position < margin) {
+      issues.push({ vesselId: vessel.id, kind: "edge", message: `Menos de ${margin} m de margem no início do cais` });
+    }
+    if (vessel.position + vessel.loa > total - margin) {
+      issues.push({ vesselId: vessel.id, kind: "edge", message: `Menos de ${margin} m de margem no final do cais` });
+    }
+  }
+
+  for (let firstIndex = 0; firstIndex < ordered.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < ordered.length; secondIndex += 1) {
+      const previous = ordered[firstIndex];
+      const current = ordered[secondIndex];
+      const gap = current.position - (previous.position + previous.loa);
+      if (gap < 0) {
+        issues.push({ vesselId: current.id, kind: "overlap", message: `Sobreposição de ${Math.abs(gap).toFixed(0)} m com ${previous.name}` });
+        issues.push({ vesselId: previous.id, kind: "overlap", message: `Sobreposição de ${Math.abs(gap).toFixed(0)} m com ${current.name}` });
+      } else if (secondIndex === firstIndex + 1 && gap < margin) {
+        issues.push({
+          vesselId: current.id,
+          kind: "spacing",
+          message: `Afastamento de ${gap.toFixed(0)} m para ${previous.name}; mínimo configurado: ${margin} m`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+export function segmentOffsets(segments: BerthSegment[]) {
+  let current = 0;
+  return segments.map((segment) => {
+    const item = { ...segment, start: current, end: current + Math.max(0, segment.length) };
+    current = item.end;
+    return item;
+  });
+}
+
+export function vesselSectionName(vessel: Vessel, segments: BerthSegment[]) {
+  const starts = segmentOffsets(segments);
+  const endPosition = vessel.position + vessel.loa;
+  const match = starts.find((segment) => vessel.position >= segment.start && endPosition <= segment.end);
+  if (match) return match.name;
+  const touched = starts.filter((segment) => vessel.position < segment.end && endPosition > segment.start);
+  return touched.length > 1 ? "Cruza trechos" : touched[0]?.name ?? "Fora do cais";
+}
