@@ -168,7 +168,131 @@ function vitePluginPublicPlatformConfig(): Plugin {
   };
 }
 
-const plugins = [vitePluginPublicPlatformConfig(), react(), tailwindcss(), jsxLocPlugin(), vitePluginManusDebugCollector()];
+function vitePluginPraticagemApi(): Plugin {
+  return {
+    name: "praticagem-api",
+    configureServer(server) {
+      const publicDir = path.resolve(PROJECT_ROOT, "client", "public");
+      const catalogPath = path.join(publicDir, "vessels_catalog.json");
+      const livePath = path.join(publicDir, "praticagem_live.json");
+      const pythonScript = path.resolve(PROJECT_ROOT, "scripts", "sync_praticagem.py");
+      const venvPython = "D:\\Programação\\praticagem_dashboard\\scraper\\venv\\Scripts\\python.exe";
+      const pythonExe = fs.existsSync(venvPython) ? `"${venvPython}"` : "python";
+
+      // GET /api/praticagem/live
+      server.middlewares.use("/api/praticagem/live", (req, res, next) => {
+        if (req.method !== "GET") return next();
+        if (fs.existsSync(livePath)) {
+          const content = fs.readFileSync(livePath, "utf-8");
+          res.setHeader("Content-Type", "application/json");
+          res.end(content);
+        } else {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ updatedAt: "", count: 0, maneuvers: [] }));
+        }
+      });
+
+      // POST /api/praticagem/sync
+      server.middlewares.use("/api/praticagem/sync", (req, res, next) => {
+        if (req.method !== "POST") return next();
+        import("node:child_process").then(({ exec }) => {
+          exec(`${pythonExe} "${pythonScript}"`, (err, stdout) => {
+            if (err) {
+              res.statusCode = 500;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", message: String(err) }));
+              return;
+            }
+            let result = { status: "success", maneuversCount: 0, catalogCount: 0 };
+            try {
+              const lines = stdout.trim().split("\n");
+              const lastLine = lines[lines.length - 1];
+              result = JSON.parse(lastLine);
+            } catch {}
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(result));
+          });
+        });
+      });
+
+      // /api/catalog/vessels
+      server.middlewares.use("/api/catalog/vessels", (req, res, next) => {
+        const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
+        if (req.method === "GET") {
+          if (fs.existsSync(catalogPath)) {
+            const content = fs.readFileSync(catalogPath, "utf-8");
+            res.setHeader("Content-Type", "application/json");
+            res.end(content);
+          } else {
+            res.setHeader("Content-Type", "application/json");
+            res.end("[]");
+          }
+          return;
+        }
+
+        if (req.method === "POST") {
+          let body = "";
+          req.on("data", (chunk) => {
+            body += chunk;
+          });
+          req.on("end", () => {
+            try {
+              const newVessel = JSON.parse(body);
+              let list = [];
+              if (fs.existsSync(catalogPath)) {
+                try {
+                  list = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
+                } catch {}
+              }
+              const map = new Map(list.map((v: any) => [v.name.toUpperCase(), v]));
+              map.set(newVessel.name.toUpperCase(), newVessel);
+              const updated = Array.from(map.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
+              fs.writeFileSync(catalogPath, JSON.stringify(updated, null, 2), "utf-8");
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(updated));
+            } catch (e) {
+              res.statusCode = 400;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ error: String(e) }));
+            }
+          });
+          return;
+        }
+
+        if (req.method === "DELETE") {
+          const nameToDelete = url.searchParams.get("name")?.toUpperCase();
+          if (!nameToDelete) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: "Missing name" }));
+            return;
+          }
+          let list = [];
+          if (fs.existsSync(catalogPath)) {
+            try {
+              list = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
+            } catch {}
+          }
+          const updated = list.filter((v: any) => v.name.toUpperCase() !== nameToDelete);
+          fs.writeFileSync(catalogPath, JSON.stringify(updated, null, 2), "utf-8");
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(updated));
+          return;
+        }
+
+        next();
+      });
+    },
+  };
+}
+
+const plugins = [
+  vitePluginPublicPlatformConfig(),
+  vitePluginPraticagemApi(),
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,

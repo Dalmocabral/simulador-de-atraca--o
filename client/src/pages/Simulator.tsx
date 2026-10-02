@@ -7,6 +7,7 @@ import {
   Download,
   Info,
   Plus,
+  Radio,
   Ruler,
   Save,
   Settings,
@@ -26,6 +27,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import BerthBlueprint from "@/components/berth-blueprint";
+import AddVesselModal from "@/components/AddVesselModal";
+import { saveVesselToCatalog } from "@/lib/vessel-catalog";
 import {
   calculateIssues,
   createBollardInventory,
@@ -78,6 +81,7 @@ export default function Simulator() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [storageError, setStorageError] = useState(false);
   const [notice, setNotice] = useState("");
+  const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const bollardImportRef = useRef<HTMLInputElement>(null);
 
@@ -404,6 +408,9 @@ export default function Simulator() {
               </div>
             </DialogContent>
           </Dialog>
+          <button className="button button-quiet" type="button" onClick={() => setIsAddVesselModalOpen(true)} title="Consultar chegadas da Praticagem RJ ou catálogo salvo">
+            <Radio size={14} className="text-emerald-600" /> <span>Praticagem RJ / Catálogo</span>
+          </button>
           <button className="button button-quiet" type="button" onClick={exportScenario} title="Baixar cenário como JSON">
             <Download size={16} /> <span>Exportar</span>
           </button>
@@ -518,7 +525,7 @@ export default function Simulator() {
                 <div className="section-kicker">FROTA DO CENÁRIO</div>
                 <h2>Navios</h2>
               </div>
-              <button className="button button-add" type="button" onClick={addVessel}><Plus size={16} /> Adicionar</button>
+              <button className="button button-add" type="button" onClick={() => setIsAddVesselModalOpen(true)}><Plus size={16} /> Adicionar</button>
             </div>
             <div className="vessel-list">
               {scenario.vessels.map((vessel) => {
@@ -536,7 +543,7 @@ export default function Simulator() {
                   </button>
                 );
               })}
-              {scenario.vessels.length === 0 && <div className="empty-list"><Ship size={23} /><span>Nenhum navio no cenário.</span><button type="button" onClick={addVessel}>Adicionar o primeiro navio</button></div>}
+              {scenario.vessels.length === 0 && <div className="empty-list"><Ship size={23} /><span>Nenhum navio no cenário.</span><button type="button" onClick={() => setIsAddVesselModalOpen(true)}>Adicionar embarcação</button></div>}
             </div>
 
             {selectedVessel ? (
@@ -546,7 +553,26 @@ export default function Simulator() {
                   <button type="button" className="icon-button delete-vessel" title="Remover navio" aria-label="Remover navio" onClick={() => removeVessel(selectedVessel.id)}><Trash2 size={16} /></button>
                 </div>
                 <label className="field-label" htmlFor="vessel-name">Nome do navio</label>
-                <input id="vessel-name" className="text-input" value={selectedVessel.name} onChange={(event) => patchVessel(selectedVessel.id, { name: event.target.value })} placeholder="Ex.: Navio Alvorada" maxLength={54} />
+                <div className="flex gap-2 items-center">
+                  <input id="vessel-name" className="text-input flex-1" value={selectedVessel.name} onChange={(event) => patchVessel(selectedVessel.id, { name: event.target.value })} placeholder="Ex.: Navio Alvorada" maxLength={54} />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveVesselToCatalog({
+                        name: selectedVessel.name,
+                        loa: selectedVessel.loa,
+                        beam: selectedVessel.beam,
+                        draft: selectedVessel.draft,
+                        berthingSide: selectedVessel.berthingSide,
+                      });
+                      setNotice(`Navio "${selectedVessel.name}" salvo no catálogo permanente.`);
+                    }}
+                    className="button button-quiet text-[10px] px-2 h-[34px] text-[#16869a]"
+                    title="Gravar este navio no catálogo permanente para futuras simulações"
+                  >
+                    <Save size={13} /> Gravar no catálogo
+                  </button>
+                </div>
 
                 <div className="field-row">
                   <div>
@@ -657,11 +683,28 @@ export default function Simulator() {
         </section>
 
         <footer className="page-footer">
-          <span><span className="footer-dot" /> Modo de demonstração</span>
-          <span>Cenários ficam neste navegador. Exporte o JSON para transportar uma cópia.</span>
+          <span><span className="footer-dot" /> Modo operacional</span>
+          <span>Simulador de atracação integrado com Praticagem RJ e catálogo permanente de navios.</span>
           <button type="button" onClick={restoreDemo}>Restaurar dados de exemplo</button>
         </footer>
         <div className="live-notice" aria-live="polite">{notice}</div>
+
+        <AddVesselModal
+          open={isAddVesselModalOpen}
+          onOpenChange={setIsAddVesselModalOpen}
+          onAddVessel={(vessel, noticeMsg) => {
+            setScenario((current) => ({
+              ...current,
+              vessels: [...current.vessels, vessel],
+            }));
+            setSelectedVesselId(vessel.id);
+            if (noticeMsg) {
+              setNotice(noticeMsg);
+            }
+          }}
+          currentVessels={scenario.vessels}
+          quayClearance={scenario.clearance}
+        />
       </main>
     </div>
   );
