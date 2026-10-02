@@ -98,12 +98,86 @@ export interface Vessel {
   vesselType?: VesselType;
 }
 
+export interface Portainer {
+  id: string; // P4, P5, P6, P7, P8, P9
+  name: string;
+  position: number;
+  color: string;
+  badgeColor: string;
+  enabled: boolean;
+}
+
+export const DEFAULT_PORTAINERS: Portainer[] = [
+  { id: "P7", name: "P7", position: 175, color: "#65a30d", badgeColor: "#4d7c0f", enabled: true },
+  { id: "P6", name: "P6", position: 215, color: "#2563eb", badgeColor: "#1d4ed8", enabled: true },
+  { id: "P9", name: "P9", position: 255, color: "#be123c", badgeColor: "#9f1239", enabled: true },
+  { id: "P8", name: "P8", position: 295, color: "#ea580c", badgeColor: "#c2410c", enabled: true },
+  { id: "P5", name: "P5", position: 640, color: "#9333ea", badgeColor: "#7e22ce", enabled: true },
+  { id: "P4", name: "P4", position: 695, color: "#78350f", badgeColor: "#58250b", enabled: true },
+];
+
+export interface PortainerLimit {
+  min?: number;
+  max?: number;
+  minLabel?: string;
+  maxLabel?: string;
+}
+
+/** Retorna os limites operacionais de deslocamento dos portêineres (P5 não passa de 297-296; P6 não passa de 291-290). */
+export function getPortainerOperationalLimits(bollards: Bollard[]): Record<string, PortainerLimit> {
+  const b297 = bollards.find((b) => b.id === "297")?.position ?? 276.9;
+  const b296 = bollards.find((b) => b.id === "296")?.position ?? 306.9;
+  const p5Min = Number(((b297 + b296) / 2).toFixed(1)); // Ponto médio entre 297 e 296
+
+  const b291 = bollards.find((b) => b.id === "291")?.position ?? 443.9;
+  const b290 = bollards.find((b) => b.id === "290")?.position ?? 473.9;
+  const p6Max = Number(((b291 + b290) / 2).toFixed(1)); // Ponto médio entre 291 e 290
+
+  return {
+    P5: {
+      min: p5Min,
+      minLabel: `Cabeços 297–296 (${p5Min.toFixed(1).replace(".", ",")} m)`,
+    },
+    P6: {
+      max: p6Max,
+      maxLabel: `Cabeços 291–290 (${p6Max.toFixed(1).replace(".", ",")} m)`,
+    },
+  };
+}
+
+/** Aplica a trava de limite do portêiner: se tentar passar do cabeço 297-296 (P5) ou 291-290 (P6), trava e retorna o aviso. */
+export function clampPortainerPosition(
+  id: string,
+  rawPosition: number,
+  bollards: Bollard[],
+  totalQuay: number
+): { position: number; hitLimit: boolean; message?: string } {
+  const limits = getPortainerOperationalLimits(bollards)[id];
+  let position = Math.max(0, Math.min(totalQuay, rawPosition));
+  let hitLimit = false;
+  let message: string | undefined;
+
+  if (limits?.min !== undefined && position < limits.min) {
+    position = limits.min;
+    hitLimit = true;
+    message = `Limite do Portêiner ${id}: o ${id} não pode passar do ponto médio entre os cabeços 297 e 296 (estação ${limits.min.toFixed(1).replace(".", ",")} m).`;
+  } else if (limits?.max !== undefined && position > limits.max) {
+    position = limits.max;
+    hitLimit = true;
+    message = `Limite do Portêiner ${id}: o ${id} não pode passar do ponto médio entre os cabeços 291 e 290 (estação ${limits.max.toFixed(1).replace(".", ",")} m).`;
+  }
+
+  return { position: Number(position.toFixed(1)), hitLimit, message };
+}
+
 export interface Scenario {
   name: string;
   clearance: number;
   segments: BerthSegment[];
   vessels: Vessel[];
   bollards: Bollard[];
+  portainers?: Portainer[];
+  showPortainers?: boolean;
 }
 
 export interface BerthIssue {
@@ -316,6 +390,8 @@ export function createDemoScenario(): Scenario {
       },
     ],
     bollards: createBollardInventory(),
+    portainers: DEFAULT_PORTAINERS.map((p) => ({ ...p })),
+    showPortainers: true,
   };
 }
 
@@ -396,12 +472,40 @@ export function normalizeScenario(value: unknown): Scenario | null {
       });
     }
 
+    // Normalizar Portêineres (P4, P5, P6, P7, P8, P9)
+    const showPortainers = typeof value.showPortainers === "boolean" ? value.showPortainers : true;
+    let portainers: Portainer[] = [];
+    if (Array.isArray(value.portainers) && value.portainers.length > 0) {
+      portainers = (value.portainers as unknown[]).flatMap((raw) => {
+        if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id) return [];
+        const def = DEFAULT_PORTAINERS.find((p) => p.id === raw.id);
+        const pos = typeof raw.position === "number" && Number.isFinite(raw.position) ? Math.max(0, raw.position) : (def?.position ?? 150);
+        return [{
+          id: raw.id,
+          name: typeof raw.name === "string" ? raw.name : raw.id,
+          position: pos,
+          color: typeof raw.color === "string" ? raw.color : (def?.color ?? "#2563eb"),
+          badgeColor: typeof raw.badgeColor === "string" ? raw.badgeColor : (def?.badgeColor ?? "#1d4ed8"),
+          enabled: typeof raw.enabled === "boolean" ? raw.enabled : true,
+        }];
+      });
+      DEFAULT_PORTAINERS.forEach((def) => {
+        if (!portainers.some((p) => p.id === def.id)) {
+          portainers.push({ ...def });
+        }
+      });
+    } else {
+      portainers = DEFAULT_PORTAINERS.map((p) => ({ ...p }));
+    }
+
   return {
     name: value.name,
     clearance: Math.max(0, value.clearance),
     segments,
     vessels,
     bollards,
+    portainers,
+    showPortainers,
   };
 }
 

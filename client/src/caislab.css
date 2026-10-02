@@ -78,7 +78,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .blueprint-summary-explainer { color: #89989d; font-size: 9px; }
 .reset-button { margin-left: auto; padding: 4px 6px; color: #71848a; background: none; border: none; font-size: 9px; white-space: nowrap; }
 .reset-button:hover { color: #275e70; text-decoration: underline; }
-.blueprint-scroll { width: 100%; max-height: max(320px, min(80vh, 820px)); overflow: auto; border-top: 1px solid #eff3f4; border-bottom: 1px solid #e9eff0; scrollbar-color: #cad7da #f6f8f8; scrollbar-width: thin; }
+.blueprint-scroll { width: 100%; max-height: max(390px, min(85vh, 900px)); overflow: auto; border-top: 1px solid #eff3f4; border-bottom: 1px solid #e9eff0; scrollbar-color: #cad7da #f6f8f8; scrollbar-width: thin; }
+.portainer-crane-group { transition: filter 0.15s ease; outline: none; }
+.portainer-crane-group:hover { filter: drop-shadow(0 2px 6px rgba(15,23,42,0.35)); }
+.portainer-dragging { filter: drop-shadow(0 4px 10px rgba(37,99,235,0.5)); cursor: grabbing !important; }
+.manifold-structure, .manifold-land-structure { cursor: pointer; pointer-events: auto; }
+.manifold-structure:hover, .manifold-land-structure:hover { opacity: 0.95 !important; }
 .blueprint-svg { display: block; max-width: none; touch-action: none; user-select: none; }
 .blueprint-ruler-label { fill: #819398; font-size: 9px; font-weight: 620; } .ship-drag-group { outline: none; }
 .ship-drag-group:focus-visible path:first-of-type { stroke: #07849a; stroke-width: 3.5; }

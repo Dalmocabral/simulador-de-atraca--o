@@ -17,6 +17,9 @@ import {
   X,
   ZoomIn,
   ZoomOut,
+  Sliders,
+  Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import {
   Dialog,
@@ -62,6 +65,10 @@ import {
   type VesselType,
   VESSEL_TYPE_LABELS,
   normalizeVesselType,
+  type Portainer,
+  DEFAULT_PORTAINERS,
+  clampPortainerPosition,
+  getPortainerOperationalLimits,
 } from "@/lib/berth-model";
 
 function metres(value: number) {
@@ -85,8 +92,74 @@ export default function Simulator() {
   const [storageError, setStorageError] = useState(false);
   const [notice, setNotice] = useState("");
   const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false);
+  const [isPortainerModalOpen, setIsPortainerModalOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const bollardImportRef = useRef<HTMLInputElement>(null);
+
+  function patchPortainer(id: string, patch: Partial<Portainer>) {
+    setScenario((curr) => {
+      const list = curr.portainers ?? DEFAULT_PORTAINERS.map((p) => ({ ...p }));
+      return {
+        ...curr,
+        portainers: list.map((p) => {
+          if (p.id !== id) return p;
+          let nextPos = patch.position !== undefined ? patch.position : p.position;
+          if (patch.position !== undefined) {
+            const clamped = clampPortainerPosition(id, nextPos, curr.bollards, total);
+            nextPos = clamped.position;
+            if (clamped.hitLimit && clamped.message) {
+              setNotice(clamped.message);
+            }
+          }
+          return { ...p, ...patch, position: nextPos };
+        }),
+      };
+    });
+  }
+
+  function alignPortainersToMidship() {
+    setScenario((curr) => {
+      const list = (curr.portainers ?? DEFAULT_PORTAINERS).map((p) => ({ ...p }));
+      // Identificar navios atracados no cais
+      const coscoLike = curr.vessels.find((v) => v.position < 450) ?? curr.vessels[0];
+      const vermilionLike = curr.vessels.find((v) => v.position >= 450) ?? curr.vessels[1];
+
+      const midship1 = coscoLike ? coscoLike.position + coscoLike.loa / 2 : 268;
+      const midship2 = vermilionLike ? vermilionLike.position + vermilionLike.loa / 2 : 690;
+
+      // P7, P6, P9, P8 em torno de midship1
+      const p7 = list.find((p) => p.id === "P7");
+      const p6 = list.find((p) => p.id === "P6");
+      const p9 = list.find((p) => p.id === "P9");
+      const p8 = list.find((p) => p.id === "P8");
+      if (p7) p7.position = Math.round(midship1 - 55);
+      if (p6) p6.position = Math.round(midship1 - 20);
+      if (p9) p9.position = Math.round(midship1 + 15);
+      if (p8) p8.position = Math.round(midship1 + 50);
+
+      // P5, P4 em torno de midship2
+      const p5 = list.find((p) => p.id === "P5");
+      const p4 = list.find((p) => p.id === "P4");
+      if (p5) p5.position = Math.round(midship2 - 25);
+      if (p4) p4.position = Math.round(midship2 + 25);
+
+      return {
+        ...curr,
+        portainers: list,
+        showPortainers: true,
+      };
+    });
+    setNotice("Portêineres posicionados a meia-nau dos navios (P7, P6, P9, P8 e P5, P4).");
+  }
+
+  function resetPortainers() {
+    setScenario((curr) => ({
+      ...curr,
+      portainers: DEFAULT_PORTAINERS.map((p) => ({ ...p })),
+      showPortainers: true,
+    }));
+    setNotice("Posições dos 6 portêineres (P4 a P9) restauradas para os valores padrão do terminal.");
+  }
 
   const total = totalQuayLength(scenario.segments);
   const positionedBollards = scenario.bollards.filter((bollard) => bollard.position !== null && bollard.position <= total).length;
@@ -475,6 +548,28 @@ export default function Simulator() {
                   <input id="clearance-input" type="number" min="0" step="1" value={scenario.clearance} onChange={(event) => patchScenario({ clearance: Math.max(0, Number(event.target.value)) })} />
                   <span>m</span>
                 </label>
+
+                {/* Opção check para os 6 portêineres (P4 a P9) */}
+                <label className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#dfe7e9] rounded-md text-xs font-semibold text-[#1e3a47] cursor-pointer hover:bg-[#f6fafa] shadow-xs select-none">
+                  <input
+                    type="checkbox"
+                    checked={scenario.showPortainers ?? true}
+                    onChange={(e) => patchScenario({ showPortainers: e.target.checked })}
+                    className="w-3.5 h-3.5 accent-[#16869a] rounded"
+                  />
+                  <span>Portêineres (P4–P9)</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPortainerModalOpen(true)}
+                  className="button button-quiet text-xs px-2.5 py-1 h-[29px] text-[#16869a] flex items-center gap-1.5 font-semibold"
+                  title="Configurar posições e visibilidade individual dos 6 portêineres"
+                >
+                  <Sliders size={13} />
+                  <span>Configurar PTs</span>
+                </button>
+
                 <span className="zoom-label" title="Amplia toda a vista proporcionalmente; não altera as medidas ou parâmetros cadastrados.">ZOOM DA VISTA</span>
                 <div className="zoom-control" aria-label="Zoom do blueprint">
                   <button type="button" onClick={() => setZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))} aria-label="Diminuir zoom" disabled={zoom <= 0.5}><ZoomOut size={16} /></button>
@@ -504,12 +599,16 @@ export default function Simulator() {
               onMoveVessel={(id, position) => patchVessel(id, { position })}
               onAssignMooringLine={(vesselId, lineId, bollardId) => patchMooringLine(vesselId, lineId, { bollardId })}
               onUpdateBollard={updateBollard}
+              onMovePortainer={(id, position) => patchPortainer(id, { position })}
+              onPortainerLimitHit={(msg) => setNotice(msg)}
             />
 
             <div className="blueprint-legend">
               <span><i className="legend-ship" /> Porta-contêineres</span>
               <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 10, height: 7, background: "#4f6277", border: "1px solid #1e293b", borderRadius: 1 }} /> Carga Geral</span>
               <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 10, height: 7, background: "#fef08a", border: "1px solid #ca8a04", borderRadius: 1 }} /> Petroleiro</span>
+              <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 14, height: 8, background: "#4d7c0f", border: "1px solid #1e293b", borderRadius: 2 }} /> Portêineres (P4 a P9)</span>
+              <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 11, height: 7, background: "#f8fafc", border: "1.5px solid #b91c1c", borderRadius: 1 }} /> Manifolds químicos</span>
               <span><i className="legend-quay" /> Trecho de cais</span>
               <span><i className="legend-gap" /> Afastamento</span>
               <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 8, height: 12, background: "#3a7ebf", borderRadius: 2 }} /> Duplo</span>
@@ -520,7 +619,7 @@ export default function Simulator() {
               <span><i className="legend-line legend-line-lancante" /> Lançante</span>
               <span><i className="legend-line legend-line-spring" /> Spring</span>
               <span><i className="legend-gangway" /> Marcação da proa</span>
-              <span className="drag-hint">Arraste navios e pontas amarelas; use ← → no navio ou no cabo selecionado</span>
+              <span className="drag-hint">Arraste navios, portêineres e pontas amarelas; use ← → no navio ou no cabo selecionado</span>
             </div>
           </article>
 
@@ -727,6 +826,171 @@ export default function Simulator() {
           currentVessels={scenario.vessels}
           quayClearance={scenario.clearance}
         />
+
+        {/* Modal de Configuração dos Portêineres (P4 a P9) */}
+        <Dialog open={isPortainerModalOpen} onOpenChange={setIsPortainerModalOpen}>
+          <DialogContent className="sm:max-w-xl p-6 bg-white border border-[#d8e1e4] rounded-xl shadow-2xl">
+            <DialogHeader>
+              <div className="section-kicker">INFRAESTRUTURA DE CARGA</div>
+              <DialogTitle className="text-lg font-bold text-[#102d40] flex items-center justify-between">
+                <span>Portêineres STS do Terminal (P4 a P9)</span>
+                <span className="text-xs font-mono font-bold bg-[#e0f2fe] text-[#0369a1] px-2.5 py-1 rounded-full border border-[#bae6fd]">
+                  6 Guindastes de Cais
+                </span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[#64748b]">
+                Gerenciamento operacional dos 6 guindastes de contêineres STS (Ship-to-Shore) do cais.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2">
+              {/* Barra superior com interruptor geral e ações rápidas */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg">
+                <label className="flex items-center gap-2 text-xs font-bold text-[#0f172a] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={scenario.showPortainers ?? true}
+                    onChange={(e) => patchScenario({ showPortainers: e.target.checked })}
+                    className="w-4 h-4 accent-[#16869a] rounded"
+                  />
+                  <span>Exibir portêineres no blueprint</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={alignPortainersToMidship}
+                    className="button button-primary text-xs px-2.5 py-1 h-[30px] flex items-center gap-1.5 shadow-xs"
+                    title="Posicionar portêineres a meia-nau das embarcações conforme instrução operacional do terminal"
+                  >
+                    <Sparkles size={13} />
+                    <span>Meia-nau dos navios</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetPortainers}
+                    className="button button-quiet text-xs px-2.5 py-1 h-[30px] text-[#64748b] flex items-center gap-1.5 hover:text-[#0f172a]"
+                    title="Restaurar posições originais dos 6 portêineres"
+                  >
+                    <RotateCcw size={13} />
+                    <span>Redefinir</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista dos 6 Portêineres */}
+              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                {(scenario.portainers ?? DEFAULT_PORTAINERS).map((pt) => {
+                  const ptLimits = getPortainerOperationalLimits(scenario.bollards)[pt.id];
+                  const section = scenario.segments.length > 0
+                    ? (() => {
+                        let cur = 0;
+                        for (const seg of scenario.segments) {
+                          if (pt.position >= cur && pt.position <= cur + seg.length) {
+                            return seg.name;
+                          }
+                          cur += seg.length;
+                        }
+                        return "Fora do cais";
+                      })()
+                    : "Cais";
+
+                  const overVessel = scenario.vessels.find(
+                    (v) => pt.position >= v.position && pt.position <= v.position + v.loa
+                  );
+
+                  return (
+                    <div
+                      key={pt.id}
+                      className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border transition-all ${
+                        pt.enabled
+                          ? "bg-white border-[#cbd5e1] hover:border-[#94a3b8] shadow-xs"
+                          : "bg-[#f1f5f9] border-[#e2e8f0] opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={pt.enabled}
+                          onChange={(e) => patchPortainer(pt.id, { enabled: e.target.checked })}
+                          className="w-4 h-4 accent-[#16869a] rounded cursor-pointer"
+                          title={`Ativar ou ocultar ${pt.name}`}
+                        />
+                        <span
+                          className="w-9 h-6 rounded flex items-center justify-center text-white text-[11px] font-black font-mono shadow-xs shrink-0"
+                          style={{ background: pt.badgeColor }}
+                        >
+                          {pt.name}
+                        </span>
+                        <div>
+                          <div className="text-xs font-bold text-[#0f172a] flex items-center gap-1.5">
+                            <span>Portêiner {pt.name}</span>
+                            <span className="text-[10px] text-[#64748b] font-normal">· {section}</span>
+                            {ptLimits?.min !== undefined && (
+                              <span className="text-[9.5px] font-bold text-[#7e22ce] bg-[#f3e8ff] px-1.5 py-0.5 rounded border border-[#d8b4fe]">
+                                Limite mín: {ptLimits.min} m (297–296)
+                              </span>
+                            )}
+                            {ptLimits?.max !== undefined && (
+                              <span className="text-[9.5px] font-bold text-[#1d4ed8] bg-[#dbeafe] px-1.5 py-0.5 rounded border border-[#93c5fd]">
+                                Limite máx: {ptLimits.max} m (291–290)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10.5px] text-[#64748b]">
+                            {overVessel ? (
+                              <span className="text-[#0369a1] font-semibold">
+                                Operando sobre: {overVessel.name}
+                              </span>
+                            ) : (
+                              <span>Sem navio sob a lança</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs text-[#64748b] font-medium">Estação:</span>
+                        <div className="flex items-center">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min={ptLimits?.min ?? 0}
+                            max={ptLimits?.max ?? total}
+                            value={pt.position}
+                            onChange={(e) => patchPortainer(pt.id, { position: Math.max(0, Number(e.target.value)) })}
+                            className="w-20 h-8 px-2 border border-[#cbd5e1] rounded-l-md text-xs font-mono font-bold text-[#0f172a] focus:outline-none focus:border-[#16869a]"
+                          />
+                          <span className="h-8 px-2 bg-[#f1f5f9] border border-l-0 border-[#cbd5e1] rounded-r-md text-[11px] font-bold text-[#64748b] flex items-center">
+                            m
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-2.5 bg-[#fefce8] border border-[#fef08a] rounded-md text-[11px] text-[#854d0e] flex items-start gap-2">
+                <Info size={15} className="shrink-0 mt-0.5" />
+                <span>
+                  <strong>Limites Operacionais:</strong> o <strong>P5</strong> não pode ultrapassar o ponto médio entre os cabeços <strong>297 e 296</strong>. O <strong>P6</strong> não pode ultrapassar o ponto médio entre os cabeços <strong>291 e 290</strong>. Se tentar ultrapassar, o portêiner trava imediatamente e exibe o alerta.
+                </span>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-[#edf1f2]">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => setIsPortainerModalOpen(false)}
+                >
+                  Concluir
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

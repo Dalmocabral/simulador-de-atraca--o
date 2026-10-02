@@ -13,6 +13,10 @@ import {
   BOLLARD_TYPES,
   type VesselType,
   VESSEL_TYPE_LABELS,
+  type Portainer,
+  DEFAULT_PORTAINERS,
+  getPortainerOperationalLimits,
+  clampPortainerPosition,
 } from "@/lib/berth-model";
 
 import {
@@ -31,10 +35,12 @@ interface BerthBlueprintProps {
   onMoveVessel: (id: string, position: number) => void;
   onAssignMooringLine: (vesselId: string, lineId: string, bollardId: string) => void;
   onUpdateBollard?: (id: string, patch: { id?: string; position?: number | null; type?: BollardType }) => void;
+  onMovePortainer?: (id: string, position: number) => void;
+  onPortainerLimitHit?: (message: string) => void;
 }
 
 const PAD = 54;
-const HEIGHT = 320;
+const HEIGHT = 390;
 const QUAY_Y = 218;
 const CABLE_END_Y = 205;
 const VESSEL_BERTH_BOTTOM_Y = QUAY_Y - 55; // 55 px de distância do cais (metade dos 110 px)
@@ -583,6 +589,326 @@ function renderTankerDeck(
   );
 }
 
+/** Renderiza o blueprint de topo de um Portêiner STS (guindaste de cais para contêineres P4 a P9) */
+function renderPortainerSvg({
+  portainer,
+  scale,
+  trackStart,
+  isHovered,
+  isDragging,
+  onPointerDown,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  portainer: Portainer;
+  scale: number;
+  trackStart: number;
+  isHovered: boolean;
+  isDragging: boolean;
+  onPointerDown: (e: React.PointerEvent<SVGGElement>) => void;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+}) {
+  const cx = trackStart + portainer.position * scale;
+  const seaRailY = 242;
+  const landRailY = 272;
+  const boomTipY = 110;
+  const sillLeftX = cx - 9;
+  const sillRightX = cx + 9;
+  const girderLeftX = cx - 4.2;
+  const girderRightX = cx + 4.2;
+
+  // Rótulo com setas conforme o modelo original do terminal
+  let arrowLabel = portainer.name;
+  if (portainer.id === "P7") arrowLabel = "P7 ▶";
+  else if (portainer.id === "P6") arrowLabel = "◀ P6";
+  else if (portainer.id === "P5") arrowLabel = "P5 ▶";
+  else if (portainer.id === "P4") arrowLabel = "◀ P4";
+
+  return (
+    <g
+      key={`portainer-${portainer.id}`}
+      className={`portainer-crane-group ${isDragging ? "portainer-dragging" : ""}`}
+      style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+      onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <title>{`Portêiner ${portainer.name} · Estação ${portainer.position.toFixed(1).replace(".", ",")} m · Arraste para reposicionar ao longo do cais`}</title>
+
+      {/* Linha guia de centro / alinhamento do portêiner */}
+      <line
+        x1={cx}
+        y1={boomTipY}
+        x2={cx}
+        y2={284}
+        stroke={portainer.color}
+        strokeWidth="0.8"
+        strokeDasharray="3 3"
+        opacity="0.4"
+      />
+
+      {/* Lança Marítima (Boom) projetando-se sobre o navio */}
+      {/* Vigas principais da lança */}
+      <line
+        x1={girderLeftX}
+        y1={boomTipY}
+        x2={girderLeftX}
+        y2={landRailY}
+        stroke={portainer.color}
+        strokeWidth="1.8"
+      />
+      <line
+        x1={girderRightX}
+        y1={boomTipY}
+        x2={girderRightX}
+        y2={landRailY}
+        stroke={portainer.color}
+        strokeWidth="1.8"
+      />
+
+      {/* Ponta da lança marítima (Headframe) */}
+      <line
+        x1={girderLeftX - 1.5}
+        y1={boomTipY}
+        x2={girderRightX + 1.5}
+        y2={boomTipY}
+        stroke="#0f172a"
+        strokeWidth="2.4"
+      />
+      <circle cx={girderLeftX} cy={boomTipY} r="1.4" fill="#f8fafc" stroke="#0f172a" strokeWidth="0.6" />
+      <circle cx={girderRightX} cy={boomTipY} r="1.4" fill="#f8fafc" stroke="#0f172a" strokeWidth="0.6" />
+
+      {/* Tirantes e treliças diagonais da lança (Lattice rungs) */}
+      {Array.from({ length: 15 }, (_, i) => {
+        const yRung = boomTipY + 4 + i * 8;
+        if (yRung >= seaRailY) return null;
+        return (
+          <g key={`rung-${i}`}>
+            <line
+              x1={girderLeftX}
+              y1={yRung}
+              x2={girderRightX}
+              y2={yRung}
+              stroke={portainer.color}
+              strokeWidth="0.9"
+              opacity="0.8"
+            />
+            <line
+              x1={girderLeftX}
+              y1={yRung}
+              x2={girderRightX}
+              y2={yRung + 8}
+              stroke={portainer.color}
+              strokeWidth="0.6"
+              opacity="0.55"
+            />
+          </g>
+        );
+      })}
+
+      {/* Carro do Trole (Trolley) com Spreader telescópico sobre as baías de contêineres */}
+      <g>
+        {/* Carro do trole sobre os trilhos da lança */}
+        <rect
+          x={cx - 6}
+          y={136}
+          width="12"
+          height="9"
+          rx="1"
+          fill="#f8fafc"
+          stroke="#0f172a"
+          strokeWidth="0.9"
+        />
+        {/* Barra amarela do spreader telescópico */}
+        <rect
+          x={cx - 7.5}
+          y={138.5}
+          width="15"
+          height="4"
+          rx="0.6"
+          fill="#eab308"
+          stroke="#854d0e"
+          strokeWidth="0.6"
+        />
+        {/* 4 guias / twistlocks nos cantos do spreader */}
+        <circle cx={cx - 6.5} cy={139.5} r="0.8" fill="#1e293b" />
+        <circle cx={cx + 6.5} cy={139.5} r="0.8" fill="#1e293b" />
+        <circle cx={cx - 6.5} cy={141.5} r="0.8" fill="#1e293b" />
+        <circle cx={cx + 6.5} cy={141.5} r="0.8" fill="#1e293b" />
+        {/* Cabine panorâmica envidraçada do operador do trole */}
+        <rect
+          x={cx + 6}
+          y={137.5}
+          width="3.5"
+          height="6"
+          rx="0.6"
+          fill="#38bdf8"
+          stroke="#0284c7"
+          strokeWidth="0.5"
+          opacity="0.9"
+        />
+      </g>
+
+      {/* Pórtico e Pernas do Guindaste sobre os dois trilhos do cais */}
+      {/* Vigas balancins longitudinais (Sills) conectando os bogies de cada lado */}
+      <line
+        x1={sillLeftX}
+        y1={seaRailY - 1}
+        x2={sillLeftX}
+        y2={landRailY + 1}
+        stroke={portainer.color}
+        strokeWidth="3.2"
+        strokeLinecap="round"
+      />
+      <line
+        x1={sillRightX}
+        y1={seaRailY - 1}
+        x2={sillRightX}
+        y2={landRailY + 1}
+        stroke={portainer.color}
+        strokeWidth="3.2"
+        strokeLinecap="round"
+      />
+
+      {/* Travessas transversais do portal sobre o cais */}
+      <line
+        x1={sillLeftX}
+        y1={seaRailY + 3}
+        x2={sillRightX}
+        y2={seaRailY + 3}
+        stroke={portainer.color}
+        strokeWidth="2.2"
+      />
+      <line
+        x1={sillLeftX}
+        y1={landRailY - 3}
+        x2={sillRightX}
+        y2={landRailY - 3}
+        stroke={portainer.color}
+        strokeWidth="2.2"
+      />
+
+      {/* Contraventamento diagonal do pórtico (X-bracing) */}
+      <line
+        x1={sillLeftX + 1}
+        y1={seaRailY + 4}
+        x2={sillRightX - 1}
+        y2={landRailY - 4}
+        stroke={portainer.color}
+        strokeWidth="1.2"
+        opacity="0.8"
+      />
+      <line
+        x1={sillRightX - 1}
+        y1={seaRailY + 4}
+        x2={sillLeftX + 1}
+        y2={landRailY - 4}
+        stroke={portainer.color}
+        strokeWidth="1.2"
+        opacity="0.8"
+      />
+
+      {/* 4 Truques de Rodas (Bogies / Wheel trucks) sobre os trilhos */}
+      {/* Bogies do trilho marítimo (seaward rail) */}
+      <rect x={sillLeftX - 3.5} y={seaRailY - 2.5} width="7" height="5" rx="1.2" fill="#334155" stroke="#0f172a" strokeWidth="0.8" />
+      <circle cx={sillLeftX - 1.8} cy={seaRailY} r="1" fill="#cbd5e1" />
+      <circle cx={sillLeftX + 1.8} cy={seaRailY} r="1" fill="#cbd5e1" />
+
+      <rect x={sillRightX - 3.5} y={seaRailY - 2.5} width="7" height="5" rx="1.2" fill="#334155" stroke="#0f172a" strokeWidth="0.8" />
+      <circle cx={sillRightX - 1.8} cy={seaRailY} r="1" fill="#cbd5e1" />
+      <circle cx={sillRightX + 1.8} cy={seaRailY} r="1" fill="#cbd5e1" />
+
+      {/* Bogies do trilho terrestre (landward rail) */}
+      <rect x={sillLeftX - 3.5} y={landRailY - 2.5} width="7" height="5" rx="1.2" fill="#334155" stroke="#0f172a" strokeWidth="0.8" />
+      <circle cx={sillLeftX - 1.8} cy={landRailY} r="1" fill="#cbd5e1" />
+      <circle cx={sillLeftX + 1.8} cy={landRailY} r="1" fill="#cbd5e1" />
+
+      <rect x={sillRightX - 3.5} y={landRailY - 2.5} width="7" height="5" rx="1.2" fill="#334155" stroke="#0f172a" strokeWidth="0.8" />
+      <circle cx={sillRightX - 1.8} cy={landRailY} r="1" fill="#cbd5e1" />
+      <circle cx={sillRightX + 1.8} cy={landRailY} r="1" fill="#cbd5e1" />
+
+      {/* Contra-lança terrestre (Backreach) e Casa de Máquinas / Guincho (Machinery House) */}
+      <rect
+        x={cx - 7.5}
+        y={landRailY + 0.5}
+        width="15"
+        height="9"
+        rx="1.5"
+        fill={portainer.color}
+        stroke="#0f172a"
+        strokeWidth="1"
+      />
+      <rect
+        x={cx - 5.5}
+        y={landRailY + 2}
+        width="11"
+        height="6"
+        rx="0.8"
+        fill="#1e293b"
+        opacity="0.35"
+      />
+      <line
+        x1={cx}
+        y1={landRailY + 1}
+        x2={cx}
+        y2={landRailY + 9}
+        stroke="#ffffff"
+        strokeWidth="0.8"
+        opacity="0.6"
+      />
+
+      {/* Plaqueta de identificação do Portêiner (ex: P7, P6, P9, etc.) conforme desenho oficial */}
+      <g>
+        <rect
+          x={cx - 15}
+          y={284}
+          width="30"
+          height="16"
+          rx="3.5"
+          fill={portainer.badgeColor}
+          stroke={isHovered ? "#facc15" : "#ffffff"}
+          strokeWidth={isHovered ? "1.8" : "1.2"}
+          filter={isHovered || isDragging ? "drop-shadow(0 2px 5px rgba(0,0,0,0.35))" : "drop-shadow(0 1px 2px rgba(0,0,0,0.2))"}
+        />
+        <text
+          x={cx}
+          y={292}
+          textAnchor="middle"
+          dominantBaseline="central"
+          style={{
+            fill: "#ffffff",
+            fontSize: "8.5px",
+            fontWeight: 900,
+            letterSpacing: "0.4px",
+            userSelect: "none",
+            pointerEvents: "none",
+          }}
+        >
+          {arrowLabel}
+        </text>
+
+        {/* Cota em metros logo abaixo do badge */}
+        <text
+          x={cx}
+          y={304}
+          textAnchor="middle"
+          style={{
+            fill: "#334155",
+            fontSize: "6px",
+            fontWeight: 800,
+            fontVariantNumeric: "tabular-nums",
+            userSelect: "none",
+            pointerEvents: "none",
+          }}
+        >
+          {Math.round(portainer.position)} m
+        </text>
+      </g>
+    </g>
+  );
+}
+
 export default function BerthBlueprint({
   scenario,
   zoom,
@@ -591,11 +917,14 @@ export default function BerthBlueprint({
   onMoveVessel,
   onAssignMooringLine,
   onUpdateBollard,
+  onMovePortainer,
+  onPortainerLimitHit,
 }: BerthBlueprintProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<
     | { kind: "vessel"; id: string; grabOffset: number }
     | { kind: "mooring"; vesselId: string; lineId: string }
+    | { kind: "portainer"; id: string; grabOffset: number }
     | null
   >(null);
   const [activeBollardId, setActiveBollardId] = useState<string | null>(null);
@@ -605,6 +934,7 @@ export default function BerthBlueprint({
   const [editPosition, setEditPosition] = useState<string>("");
   const [lineDragPoint, setLineDragPoint] = useState<{ x: number; y: number } | null>(null);
   const [hoveredBollardId, setHoveredBollardId] = useState<string | null>(null);
+  const [hoveredPortainerId, setHoveredPortainerId] = useState<string | null>(null);
   const total = scenario.segments.reduce((sum, segment) => sum + Math.max(0, segment.length), 0);
   const scale = Math.max(0.68, 900 / Math.max(total, 1));
   const width = total * scale + PAD * 2;
@@ -619,6 +949,26 @@ export default function BerthBlueprint({
   const hoveredDisplay = hoveredBollardId ? bollardDisplayById.get(hoveredBollardId) : null;
   const hoveredBollard = hoveredBollardId ? bollardById.get(hoveredBollardId) : null;
   const issueByVessel = new Map<string, string[]>();
+
+  const operationalLimits = getPortainerOperationalLimits(scenario.bollards);
+  const p5LimitM = operationalLimits.P5?.min;
+  const p6LimitM = operationalLimits.P6?.max;
+  const p5LimitX = p5LimitM !== undefined ? trackStart + p5LimitM * scale : null;
+  const p6LimitX = p6LimitM !== undefined ? trackStart + p6LimitM * scale : null;
+
+  const portainersList = scenario.portainers ?? DEFAULT_PORTAINERS;
+  const p5Portainer = portainersList.find((p) => p.id === "P5");
+  const p6Portainer = portainersList.find((p) => p.id === "P6");
+  const isP5Active = scenario.showPortainers !== false && (p5Portainer ? p5Portainer.enabled : true);
+  const isP6Active = scenario.showPortainers !== false && (p6Portainer ? p6Portainer.enabled : true);
+
+  const b297 = scenario.bollards.find((b) => b.id === "297")?.position ?? 276.9;
+  const b296 = scenario.bollards.find((b) => b.id === "296")?.position ?? 306.9;
+  const b294 = scenario.bollards.find((b) => b.id === "294")?.position ?? 362.9;
+
+  const manifold297_296_M = (b297 + b296) / 2; // ~291.9m
+  const manifold297_296_X = trackStart + manifold297_296_M * scale;
+  const manifold294_X = trackStart + b294 * scale;
   for (const issue of calculateIssues(scenario)) {
     issueByVessel.set(issue.vesselId, [...(issueByVessel.get(issue.vesselId) ?? []), issue.message]);
   }
@@ -664,6 +1014,14 @@ export default function BerthBlueprint({
     svgRef.current?.setPointerCapture(event.pointerId);
   }
 
+  function onPortainerPointerDown(event: React.PointerEvent<SVGGElement>, id: string, position: number) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragRef.current = { kind: "portainer", id, grabOffset: positionAt(event.clientX) - position };
+    svgRef.current?.setPointerCapture(event.pointerId);
+  }
+
   function startMooringDrag(event: React.PointerEvent<SVGCircleElement>, vesselId: string, lineId: string, x: number, y: number) {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -691,6 +1049,13 @@ export default function BerthBlueprint({
     if (drag.kind === "vessel") {
       const next = positionAt(event.clientX) - drag.grabOffset;
       onMoveVessel(drag.id, Math.round(next * 10) / 10);
+    } else if (drag.kind === "portainer") {
+      const rawNext = positionAt(event.clientX) - drag.grabOffset;
+      const clamped = clampPortainerPosition(drag.id, rawNext, scenario.bollards, total);
+      onMovePortainer?.(drag.id, clamped.position);
+      if (clamped.hitLimit && clamped.message) {
+        onPortainerLimitHit?.(clamped.message);
+      }
     } else {
       setLineDragPoint(pointAt(event.clientX, event.clientY));
     }
@@ -919,8 +1284,205 @@ export default function BerthBlueprint({
           );
         })}
 
-        <rect x={trackStart} y={QUAY_Y} width={total * scale} height="22" fill="#8d9da3" />
+        <rect x={trackStart} y={QUAY_Y} width={total * scale} height="60" fill="#8d9da3" />
         <rect x={trackStart} y={QUAY_Y} width={total * scale} height="4" fill="#637b84" />
+
+        {/* Trilhos dos Portêineres STS (Trilho Marítimo e Terrestre) */}
+        <g className="crane-rails" opacity={scenario.showPortainers === false ? 0.35 : 1}>
+          <line x1={trackStart} y1="242" x2={trackEnd} y2="242" stroke="#475569" strokeWidth="2.4" />
+          <line x1={trackStart} y1="242" x2={trackEnd} y2="242" stroke="#cbd5e1" strokeWidth="0.8" strokeDasharray="16 4" />
+          <line x1={trackStart} y1="272" x2={trackEnd} y2="272" stroke="#475569" strokeWidth="2.4" />
+          <line x1={trackStart} y1="272" x2={trackEnd} y2="272" stroke="#cbd5e1" strokeWidth="0.8" strokeDasharray="16 4" />
+        </g>
+
+        {/* Marcadores visuais dos Limites Operacionais (aparecem com opacidade leve somente se o respectivo portêiner estiver ativo) */}
+        {scenario.showPortainers !== false && (
+          <g className="portainer-limit-markers" pointerEvents="none">
+            {/* Limite P5 (Meio entre cabeços 297 e 296) - visível somente se P5 estiver ativo */}
+            {isP5Active && p5LimitX !== null && p5LimitM !== undefined && (() => {
+              const isHighlighted = hoveredPortainerId === "P5" || (dragRef.current?.kind === "portainer" && dragRef.current.id === "P5");
+              return (
+                <g opacity={isHighlighted ? 0.95 : 0.42} style={{ transition: "opacity 0.2s ease" }}>
+                  <line
+                    x1={p5LimitX}
+                    y1={224}
+                    x2={p5LimitX}
+                    y2={276}
+                    stroke="#9333ea"
+                    strokeWidth={isHighlighted ? "1.8" : "1.2"}
+                    strokeDasharray="3 3"
+                  />
+                  <polygon
+                    points={`${p5LimitX},224 ${p5LimitX + 4},219 ${p5LimitX - 4},219`}
+                    fill="#9333ea"
+                  />
+                  <rect
+                    x={p5LimitX - 21}
+                    y={274}
+                    width="42"
+                    height="11"
+                    rx="2.5"
+                    fill="#9333ea"
+                    stroke="#581c87"
+                    strokeWidth="0.6"
+                  />
+                  <text
+                    x={p5LimitX}
+                    y={282}
+                    textAnchor="middle"
+                    style={{ fill: "#ffffff", fontSize: "5.2px", fontWeight: 800, letterSpacing: "0.2px" }}
+                  >
+                    ◀ LIM P5 (297–296)
+                  </text>
+                </g>
+              );
+            })()}
+
+            {/* Limite P6 (Meio entre cabeços 291 e 290) - visível somente se P6 estiver ativo */}
+            {isP6Active && p6LimitX !== null && p6LimitM !== undefined && (() => {
+              const isHighlighted = hoveredPortainerId === "P6" || (dragRef.current?.kind === "portainer" && dragRef.current.id === "P6");
+              return (
+                <g opacity={isHighlighted ? 0.95 : 0.42} style={{ transition: "opacity 0.2s ease" }}>
+                  <line
+                    x1={p6LimitX}
+                    y1={224}
+                    x2={p6LimitX}
+                    y2={276}
+                    stroke="#2563eb"
+                    strokeWidth={isHighlighted ? "1.8" : "1.2"}
+                    strokeDasharray="3 3"
+                  />
+                  <polygon
+                    points={`${p6LimitX},224 ${p6LimitX + 4},219 ${p6LimitX - 4},219`}
+                    fill="#2563eb"
+                  />
+                  <rect
+                    x={p6LimitX - 21}
+                    y={274}
+                    width="42"
+                    height="11"
+                    rx="2.5"
+                    fill="#2563eb"
+                    stroke="#1e3a8a"
+                    strokeWidth="0.6"
+                  />
+                  <text
+                    x={p6LimitX}
+                    y={282}
+                    textAnchor="middle"
+                    style={{ fill: "#ffffff", fontSize: "5.2px", fontWeight: 800, letterSpacing: "0.2px" }}
+                  >
+                    LIM P6 (291–290) ▶
+                  </text>
+                </g>
+              );
+            })()}
+          </g>
+        )}
+
+        {/* Estruturas de Manifolds (centralizadores de tubulações e válvulas para granéis químicos / líquidos) */}
+        <g className="shore-manifolds-layer">
+          {/* Manifold de cais entre cabeços 297 e 296 */}
+          <g
+            className="manifold-structure"
+            opacity="0.48"
+            style={{ transition: "opacity 0.2s ease" }}
+          >
+            <title>Manifold de cais (Cabeço 297–296 · est. {manifold297_296_M.toFixed(1).replace(".", ",")}m) · Centralizador de tubulações e válvulas para navios químicos/petroleiros</title>
+            <rect x={manifold297_296_X - 6} y="230" width="12" height="6.5" rx="1.2" fill="#f8fafc" stroke="#475569" strokeWidth="0.8" />
+            <line x1={manifold297_296_X - 8} y1="233.2" x2={manifold297_296_X + 8} y2="233.2" stroke="#b91c1c" strokeWidth="1.8" />
+            <rect x={manifold297_296_X - 5} y="228.8" width="2.2" height="3" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+            <rect x={manifold297_296_X - 1.1} y="228.8" width="2.2" height="3" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+            <rect x={manifold297_296_X + 2.8} y="228.8" width="2.2" height="3" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+            <circle cx={manifold297_296_X} cy="233.2" r="1.6" fill="#f59e0b" stroke="#78350f" strokeWidth="0.5" />
+            <line x1={manifold297_296_X - 1.2} y1="233.2" x2={manifold297_296_X + 1.2} y2="233.2" stroke="#78350f" strokeWidth="0.4" />
+            <line x1={manifold297_296_X} y1="232" x2={manifold297_296_X} y2="234.4" stroke="#78350f" strokeWidth="0.4" />
+            <text
+              x={manifold297_296_X}
+              y="239.5"
+              textAnchor="middle"
+              style={{
+                fill: "#334155",
+                fontSize: "4.4px",
+                fontWeight: 800,
+                paintOrder: "stroke",
+                stroke: "#ffffff",
+                strokeWidth: "1.6px",
+                strokeLinejoin: "round",
+              }}
+            >
+              manifold
+            </text>
+          </g>
+
+          {/* Manifold de cais no cabeço 294 */}
+          <g
+            className="manifold-structure"
+            opacity="0.48"
+            style={{ transition: "opacity 0.2s ease" }}
+          >
+            <title>Manifold de cais (Cabeço 294 · est. {b294.toFixed(1).replace(".", ",")}m) · Centralizador de tubulações e válvulas para navios químicos/petroleiros</title>
+            <rect x={manifold294_X - 6} y="230" width="12" height="6.5" rx="1.2" fill="#f8fafc" stroke="#475569" strokeWidth="0.8" />
+            <line x1={manifold294_X - 8} y1="233.2" x2={manifold294_X + 8} y2="233.2" stroke="#b91c1c" strokeWidth="1.8" />
+            <rect x={manifold294_X - 5} y="228.8" width="2.2" height="3" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+            <rect x={manifold294_X - 1.1} y="228.8" width="2.2" height="3" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+            <rect x={manifold294_X + 2.8} y="228.8" width="2.2" height="3" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+            <circle cx={manifold294_X} cy="233.2" r="1.6" fill="#f59e0b" stroke="#78350f" strokeWidth="0.5" />
+            <line x1={manifold294_X - 1.2} y1="233.2" x2={manifold294_X + 1.2} y2="233.2" stroke="#78350f" strokeWidth="0.4" />
+            <line x1={manifold294_X} y1="232" x2={manifold294_X} y2="234.4" stroke="#78350f" strokeWidth="0.4" />
+            <text
+              x={manifold294_X}
+              y="239.5"
+              textAnchor="middle"
+              style={{
+                fill: "#334155",
+                fontSize: "4.4px",
+                fontWeight: 800,
+                paintOrder: "stroke",
+                stroke: "#ffffff",
+                strokeWidth: "1.6px",
+                strokeLinejoin: "round",
+              }}
+            >
+              manifold
+            </text>
+          </g>
+
+          {/* Manifold Lado Terra (na passagem dos portêineres, direção 297–296) conforme modelo */}
+          <g
+            className="manifold-land-structure"
+            opacity="0.52"
+            style={{ transition: "opacity 0.2s ease" }}
+          >
+            <title>Manifold lado terra (Direção Cabeços 297–296 · est. {manifold297_296_M.toFixed(1).replace(".", ",")}m) · Centralizador de tubulações e válvulas na passagem dos portêineres</title>
+            <rect x={manifold297_296_X - 8.5} y="253" width="17" height="10" rx="1.5" fill="#f8fafc" stroke="#64748b" strokeWidth="0.8" />
+            <line x1={manifold297_296_X - 11} y1="258" x2={manifold297_296_X + 11} y2="258" stroke="#dc2626" strokeWidth="2" />
+            <line x1={manifold297_296_X} y1="252" x2={manifold297_296_X} y2="264" stroke="#0284c7" strokeWidth="1.4" />
+            <rect x={manifold297_296_X - 11.5} y="256.5" width="2" height="3" fill="#450a0a" stroke="#000" strokeWidth="0.3" />
+            <rect x={manifold297_296_X + 9.5} y="256.5" width="2" height="3" fill="#450a0a" stroke="#000" strokeWidth="0.3" />
+            <circle cx={manifold297_296_X} cy="258" r="3.4" fill="#ffffff" stroke="#1e293b" strokeWidth="0.9" />
+            <line x1={manifold297_296_X - 2.6} y1="258" x2={manifold297_296_X + 2.6} y2="258" stroke="#1e293b" strokeWidth="0.7" />
+            <line x1={manifold297_296_X} y1="255.4" x2={manifold297_296_X} y2="260.6" stroke="#1e293b" strokeWidth="0.7" />
+            <circle cx={manifold297_296_X} cy="258" r="1.2" fill="#f59e0b" />
+            <text
+              x={manifold297_296_X + 11}
+              y="259.5"
+              style={{
+                fill: "#334155",
+                fontSize: "5.2px",
+                fontStyle: "italic",
+                fontWeight: 700,
+                letterSpacing: "0.15px",
+                paintOrder: "stroke",
+                stroke: "#ffffff",
+                strokeWidth: "1.6px",
+                strokeLinejoin: "round",
+              }}
+            >
+              manifold lado terra
+            </text>
+          </g>
+        </g>
 
         {/* Cabeços numerados com cores oficiais e numeração na vertical */}
         {bollardDisplays.map((display) => {
@@ -974,7 +1536,7 @@ export default function BerthBlueprint({
                 x1={x}
                 y1="200"
                 x2={x}
-                y2="235"
+                y2="224"
                 stroke={isHovered ? "#f1cc19" : "#111a1d"}
                 strokeWidth={isHovered ? "2.6" : "2.2"}
               />
@@ -1022,22 +1584,22 @@ export default function BerthBlueprint({
           const dist = Math.abs(next.position - display.position);
           const midX = (x1 + x2) / 2;
           const pixelGap = Math.abs(x2 - x1);
-          if (pixelGap < 16) return null;
+          if (dist < 0.1 || pixelGap < 5) return null;
           return (
             <g key={`gap-bollard-${display.id}-${next.id}`} pointerEvents="none">
               <text
                 x={midX}
-                y="228"
+                y="221"
                 textAnchor="middle"
                 dominantBaseline="central"
                 style={{
                   fill: "#1f2937",
-                  fontSize: "5.4px",
+                  fontSize: pixelGap < 13 ? "4.8px" : "5.4px",
                   fontWeight: 800,
                   fontVariantNumeric: "tabular-nums",
                   paintOrder: "stroke",
                   stroke: "#ffffff",
-                  strokeWidth: "2.2px",
+                  strokeWidth: pixelGap < 13 ? "1.8px" : "2.2px",
                   strokeLinejoin: "round",
                 }}
               >
@@ -1079,21 +1641,40 @@ export default function BerthBlueprint({
           );
         }))}
 
+        {/* Portêineres STS (P4, P5, P6, P7, P8, P9) */}
+        {scenario.showPortainers !== false &&
+          (scenario.portainers ?? DEFAULT_PORTAINERS)
+            .filter((p) => p.enabled)
+            .map((portainer) => {
+              const isDragging = dragRef.current?.kind === "portainer" && dragRef.current.id === portainer.id;
+              const isHovered = hoveredPortainerId === portainer.id;
+              return renderPortainerSvg({
+                portainer,
+                scale,
+                trackStart,
+                isHovered,
+                isDragging,
+                onPointerDown: (event) => onPortainerPointerDown(event, portainer.id, portainer.position),
+                onPointerEnter: () => setHoveredPortainerId(portainer.id),
+                onPointerLeave: () => setHoveredPortainerId((curr) => (curr === portainer.id ? null : curr)),
+              });
+            })}
+
         {offsets.map((segment, index) => {
           const x = trackStart + segment.start * scale;
           const segmentWidth = segment.length * scale;
           const shade = ["#e6caa5", "#e9d3b5", "#b9cbd0", "#d4e3e3"][index % 4];
           return (
             <g key={segment.id}>
-              <rect x={x} y="240" width={segmentWidth} height="43" fill={shade} stroke="#fff" strokeWidth="2" />
-              <text x={x + segmentWidth / 2} y="258" textAnchor="middle" className="segment-name">{segment.name.length > 20 ? `${segment.name.slice(0, 18)}…` : segment.name}</text>
-              <text x={x + segmentWidth / 2} y="275" textAnchor="middle" className="segment-length">{segment.length} m · {segment.start}–{segment.end} m</text>
+              <rect x={x} y="310" width={segmentWidth} height="43" fill={shade} stroke="#fff" strokeWidth="2" />
+              <text x={x + segmentWidth / 2} y="328" textAnchor="middle" className="segment-name">{segment.name.length > 20 ? `${segment.name.slice(0, 18)}…` : segment.name}</text>
+              <text x={x + segmentWidth / 2} y="345" textAnchor="middle" className="segment-length">{segment.length} m · {segment.start}–{segment.end} m</text>
             </g>
           );
         })}
-        <line x1={trackStart} y1="292" x2={trackEnd} y2="292" stroke="#94a7ad" strokeWidth="1" />
-        <text x={trackStart} y="307" className="blueprint-footnote">INÍCIO DO CAIS · coordenadas longitudinais em metros</text>
-        <text x={trackEnd} y="307" textAnchor="end" className="blueprint-footnote">{total} m · FIM DO CAIS</text>
+        <line x1={trackStart} y1="362" x2={trackEnd} y2="362" stroke="#94a7ad" strokeWidth="1" />
+        <text x={trackStart} y="376" className="blueprint-footnote">INÍCIO DO CAIS · coordenadas longitudinais em metros</text>
+        <text x={trackEnd} y="376" textAnchor="end" className="blueprint-footnote">{total} m · FIM DO CAIS</text>
       </svg>
 
       {/* Card flutuante com foto real e dados ao passar o mouse pelo cabeço */}
