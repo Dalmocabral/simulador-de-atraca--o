@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleHelp,
-  Download,
   Info,
   Plus,
   Radio,
@@ -20,6 +19,7 @@ import {
   Sliders,
   Sparkles,
   RotateCcw,
+  Maximize2,
 } from "lucide-react";
 import {
   Dialog,
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import BerthBlueprint from "@/components/berth-blueprint";
 import AddVesselModal from "@/components/AddVesselModal";
+import BerthViewModal from "@/components/BerthViewModal";
 import { saveVesselToCatalog } from "@/lib/vessel-catalog";
 import {
   calculateIssues,
@@ -93,6 +94,7 @@ export default function Simulator() {
   const [notice, setNotice] = useState("");
   const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false);
   const [isPortainerModalOpen, setIsPortainerModalOpen] = useState(false);
+  const [isBerthViewModalOpen, setIsBerthViewModalOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const bollardImportRef = useRef<HTMLInputElement>(null);
 
@@ -484,14 +486,13 @@ export default function Simulator() {
               </div>
             </DialogContent>
           </Dialog>
-          <button className="button button-quiet" type="button" onClick={() => setIsAddVesselModalOpen(true)} title="Consultar chegadas da Praticagem RJ ou navios salvos">
-            <Radio size={14} className="text-emerald-600" /> <span>Praticagem RJ / Navios Salvos</span>
-          </button>
-          <button className="button button-quiet" type="button" onClick={exportScenario} title="Baixar cenário como JSON">
-            <Download size={16} /> <span>Exportar</span>
-          </button>
-          <button className="button button-primary" type="button" onClick={saveNow}>
-            <Save size={16} /> <span>Salvar</span>
+          <button
+            className="button button-quiet text-[#0284c7] hover:text-[#0369a1] hover:bg-sky-50 border border-sky-200/90 shadow-xs font-semibold"
+            type="button"
+            onClick={() => setIsBerthViewModalOpen(true)}
+            title="Abrir visualização operacional da atracação em janela ampliada ou maximizada com dados do navio e cabeços"
+          >
+            <Maximize2 size={14} className="text-[#0284c7]" /> <span>Vista da Atracação</span>
           </button>
           <input ref={importRef} type="file" accept="application/json,.json" className="visually-hidden" onChange={(event) => void importScenario(event.target.files?.[0])} />
         </div>
@@ -501,7 +502,7 @@ export default function Simulator() {
         <div className="page-heading">
           <div>
             <div className="eyebrow"><Anchor size={14} /> CENTRO DE OPERAÇÕES <span className="eyebrow-divider">/</span> ATRACAÇÃO</div>
-            <h1>Plano de ocupação</h1>
+            <h1>Plano de atracação</h1>
             <p className="page-subtitle">Monte cenários, localize cabeços e visualize navios, acessos e amarrações no cais.</p>
           </div>
           <div className="scenario-name-wrap">
@@ -539,7 +540,6 @@ export default function Simulator() {
             <div className="panel-header blueprint-header">
               <div className="panel-title-wrap">
                 <div className="section-kicker">VISTA SUPERIOR <span className="mini-live-dot" /> ATUALIZADA EM TEMPO REAL</div>
-                <h2>Blueprint do cais</h2>
                 <p>Arraste um navio para reposicionar e a ponta do cabo para escolher o cabeço.</p>
               </div>
               <div className="blueprint-controls">
@@ -629,7 +629,18 @@ export default function Simulator() {
                 <div className="section-kicker">FROTA DO CENÁRIO</div>
                 <h2>Navios</h2>
               </div>
-              <button className="button button-add" type="button" onClick={() => setIsAddVesselModalOpen(true)}><Plus size={16} /> Adicionar</button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  className="button button-quiet text-xs px-2 py-1 h-[29px] text-emerald-700 flex items-center gap-1 font-semibold"
+                  type="button"
+                  onClick={() => setIsAddVesselModalOpen(true)}
+                  title="Consultar chegadas da Praticagem RJ e Navios Salvos"
+                >
+                  <Radio size={13} className="text-emerald-600" />
+                  <span>Praticagem / Salvos</span>
+                </button>
+                <button className="button button-add" type="button" onClick={() => setIsAddVesselModalOpen(true)}><Plus size={16} /> Adicionar</button>
+              </div>
             </div>
             <div className="vessel-list">
               {scenario.vessels.map((vessel) => {
@@ -718,10 +729,10 @@ export default function Simulator() {
                 <div className="position-context"><Anchor size={13} /> Medida desde o início do cais · {vesselSectionName(selectedVessel, scenario.segments)}</div>
 
                 <div className="berthing-side-field">
-                  <label className="field-label" htmlFor="vessel-berthing-side">Lado voltado para o cais</label>
+                  <label className="field-label" htmlFor="vessel-berthing-side">Lado de atracação</label>
                   <select id="vessel-berthing-side" className="side-select" value={selectedVessel.berthingSide} onChange={(event) => patchVessel(selectedVessel.id, { berthingSide: event.target.value as BerthingSide })}>
-                    <option value="boreste">Boreste junto ao cais</option>
-                    <option value="bombordo">Bombordo junto ao cais</option>
+                    <option value="bombordo">Bombordo</option>
+                    <option value="boreste">Boreste</option>
                   </select>
                   <p className="form-hint">O traço colorido identifica o bordo voltado ao cais; a direção longitudinal de proa e popa permanece igual.</p>
                 </div>
@@ -991,6 +1002,20 @@ export default function Simulator() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Vista Operacional da Atracação com tela cheia e HUD no canto superior direito */}
+        <BerthViewModal
+          isOpen={isBerthViewModalOpen}
+          onClose={() => setIsBerthViewModalOpen(false)}
+          scenario={scenario}
+          selectedVesselId={selectedVesselId}
+          onSelectVessel={setSelectedVesselId}
+          onMoveVessel={(id, position) => patchVessel(id, { position })}
+          onAssignMooringLine={(vesselId, lineId, bollardId) => patchMooringLine(vesselId, lineId, { bollardId })}
+          onUpdateBollard={updateBollard}
+          onMovePortainer={(id, position) => patchPortainer(id, { position })}
+          onPortainerLimitHit={(msg) => setNotice(msg)}
+        />
       </main>
     </div>
   );

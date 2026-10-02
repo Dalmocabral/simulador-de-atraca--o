@@ -37,6 +37,7 @@ interface BerthBlueprintProps {
   onUpdateBollard?: (id: string, patch: { id?: string; position?: number | null; type?: BollardType }) => void;
   onMovePortainer?: (id: string, position: number) => void;
   onPortainerLimitHit?: (message: string) => void;
+  isPresentationMode?: boolean;
 }
 
 const PAD = 54;
@@ -596,6 +597,7 @@ function renderPortainerSvg({
   trackStart,
   isHovered,
   isDragging,
+  isPresentationMode = false,
   onPointerDown,
   onPointerEnter,
   onPointerLeave,
@@ -605,6 +607,7 @@ function renderPortainerSvg({
   trackStart: number;
   isHovered: boolean;
   isDragging: boolean;
+  isPresentationMode?: boolean;
   onPointerDown: (e: React.PointerEvent<SVGGElement>) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
@@ -629,7 +632,14 @@ function renderPortainerSvg({
     <g
       key={`portainer-${portainer.id}`}
       className={`portainer-crane-group ${isDragging ? "portainer-dragging" : ""}`}
-      style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+      style={{
+        cursor: isDragging ? "grabbing" : "grab",
+        touchAction: "none",
+        opacity: isPresentationMode
+          ? (isDragging ? 0.95 : isHovered ? 0.85 : 0.22)
+          : (isDragging ? 0.98 : 1),
+        transition: "opacity 0.2s ease",
+      }}
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -919,6 +929,7 @@ export default function BerthBlueprint({
   onUpdateBollard,
   onMovePortainer,
   onPortainerLimitHit,
+  isPresentationMode = false,
 }: BerthBlueprintProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<
@@ -959,8 +970,8 @@ export default function BerthBlueprint({
   const portainersList = scenario.portainers ?? DEFAULT_PORTAINERS;
   const p5Portainer = portainersList.find((p) => p.id === "P5");
   const p6Portainer = portainersList.find((p) => p.id === "P6");
-  const isP5Active = scenario.showPortainers !== false && (p5Portainer ? p5Portainer.enabled : true);
-  const isP6Active = scenario.showPortainers !== false && (p6Portainer ? p6Portainer.enabled : true);
+  const isP5Active = (isPresentationMode || scenario.showPortainers !== false) && (p5Portainer ? (isPresentationMode || p5Portainer.enabled) : true);
+  const isP6Active = (isPresentationMode || scenario.showPortainers !== false) && (p6Portainer ? (isPresentationMode || p6Portainer.enabled) : true);
 
   const b297 = scenario.bollards.find((b) => b.id === "297")?.position ?? 276.9;
   const b296 = scenario.bollards.find((b) => b.id === "296")?.position ?? 306.9;
@@ -1010,8 +1021,10 @@ export default function BerthBlueprint({
     if (event.button !== 0) return;
     event.preventDefault();
     onSelectVessel(id);
-    dragRef.current = { kind: "vessel", id, grabOffset: positionAt(event.clientX) - position };
-    svgRef.current?.setPointerCapture(event.pointerId);
+    if (!isPresentationMode) {
+      dragRef.current = { kind: "vessel", id, grabOffset: positionAt(event.clientX) - position };
+      svgRef.current?.setPointerCapture(event.pointerId);
+    }
   }
 
   function onPortainerPointerDown(event: React.PointerEvent<SVGGElement>, id: string, position: number) {
@@ -1124,8 +1137,12 @@ export default function BerthBlueprint({
           return (
             <g key={`tick-${meter}`}>
               <line x1={x} y1="33" x2={x} y2="221" stroke="#d1dde2" strokeDasharray="3 5" />
-              <line x1={x} y1="27" x2={x} y2="35" stroke="#70858f" strokeWidth="1.5" />
-              <text x={x} y="21" textAnchor="middle" className="blueprint-ruler-label">{meter} m</text>
+              {!isPresentationMode && (
+                <>
+                  <line x1={x} y1="27" x2={x} y2="35" stroke="#70858f" strokeWidth="1.5" />
+                  <text x={x} y="21" textAnchor="middle" className="blueprint-ruler-label">{meter} m</text>
+                </>
+              )}
             </g>
           );
         })}
@@ -1175,24 +1192,54 @@ export default function BerthBlueprint({
               className={`ship-drag-group ${isSelected ? "is-selected" : ""} ${isIssue ? "has-issue" : ""}`}
               role="button"
               tabIndex={0}
-              aria-label={`${vessel.name}, ${VESSEL_TYPE_LABELS[vesselType]}, ${vessel.loa} metros. Arraste para reposicionar.`}
+              aria-label={`${vessel.name}, ${VESSEL_TYPE_LABELS[vesselType]}, ${vessel.loa} metros.${!isPresentationMode ? " Arraste para reposicionar." : ""}`}
               onPointerDown={(event) => onPointerDown(event, vessel.id, vessel.position)}
               onKeyDown={(event) => {
-                if (event.key === "ArrowLeft") { event.preventDefault(); onMoveVessel(vessel.id, vessel.position - 5); }
-                if (event.key === "ArrowRight") { event.preventDefault(); onMoveVessel(vessel.id, vessel.position + 5); }
+                if (!isPresentationMode) {
+                  if (event.key === "ArrowLeft") { event.preventDefault(); onMoveVessel(vessel.id, vessel.position - 5); }
+                  if (event.key === "ArrowRight") { event.preventDefault(); onMoveVessel(vessel.id, vessel.position + 5); }
+                }
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectVessel(vessel.id);
+                }
               }}
               onClick={() => onSelectVessel(vessel.id)}
-              style={{ cursor: dragRef.current ? "grabbing" : "grab" }}
+              style={{
+                cursor: isPresentationMode
+                  ? "default"
+                  : dragRef.current?.kind === "vessel" && dragRef.current.id === vessel.id
+                  ? "grabbing"
+                  : "grab",
+              }}
             >
               <title>
                 {vessel.name} · {VESSEL_TYPE_LABELS[vesselType]} · LOA {vessel.loa} m · posição {vessel.position.toFixed(1)} m
                 {messages.length ? ` · ${messages.join("; ")}` : ""}
               </title>
-              {isSelected && <rect x={x - 5} y={y - 25} width={Math.max(18, vesselWidth + 10)} height={vesselHeight + 37} rx="9" fill="none" stroke="#16869a" strokeWidth="1.5" strokeDasharray="4 4" />}
-              <text x={x + vesselWidth / 2} y={y - 21} textAnchor="middle" className="ship-side-label">{vessel.berthingSide === "bombordo" ? "BOMBORDO AO CAIS · PROA ←" : "BORESTE AO CAIS · PROA →"}</text>
-              <text x={x + vesselWidth / 2} y={y - 10} textAnchor="middle" className={`ship-name ${isIssue ? "ship-name-issue" : ""}`}>
-                {vessel.name.length > 26 ? `${vessel.name.slice(0, 24)}…` : vessel.name}
-              </text>
+              {isSelected && !isPresentationMode && <rect x={x - 5} y={y - 25} width={Math.max(18, vesselWidth + 10)} height={vesselHeight + 37} rx="9" fill="none" stroke="#16869a" strokeWidth="1.5" strokeDasharray="4 4" />}
+              {!isPresentationMode ? (
+                <text x={x + vesselWidth / 2} y={y - 10} textAnchor="middle" className={`ship-name ${isIssue ? "ship-name-issue" : ""}`}>
+                  {vessel.name.length > 26 ? `${vessel.name.slice(0, 24)}…` : vessel.name}
+                </text>
+              ) : (
+                <text
+                  x={x + vesselWidth / 2}
+                  y={y - 14}
+                  textAnchor="middle"
+                  style={{
+                    fill: "#0f172a",
+                    fontSize: "10px",
+                    fontWeight: 800,
+                    letterSpacing: "0.6px",
+                    textTransform: "uppercase",
+                    userSelect: "none",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {vessel.name}
+                </text>
+              )}
               <g transform={vessel.berthingSide === "bombordo" ? `translate(${2 * x + vesselWidth}, 0) scale(-1, 1)` : undefined}>
                 {/* Casco exterior hidrodinâmico */}
                 <path d={`M ${x + 6} ${y} Q ${x} ${y + vesselHeight / 2} ${x + 6} ${y + vesselHeight} L ${x + vesselWidth - bowInset} ${y + vesselHeight} L ${x + vesselWidth} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset} ${y} Z`} fill="#f7fafb" stroke={isIssue ? "#bd4540" : color.stroke} strokeWidth={isIssue ? 3 : 2} strokeDasharray={isIssue ? "7 4" : undefined} />
@@ -1288,15 +1335,15 @@ export default function BerthBlueprint({
         <rect x={trackStart} y={QUAY_Y} width={total * scale} height="4" fill="#637b84" />
 
         {/* Trilhos dos Portêineres STS (Trilho Marítimo e Terrestre) */}
-        <g className="crane-rails" opacity={scenario.showPortainers === false ? 0.35 : 1}>
+        <g className="crane-rails" opacity={!isPresentationMode && scenario.showPortainers === false ? 0.35 : 1}>
           <line x1={trackStart} y1="242" x2={trackEnd} y2="242" stroke="#475569" strokeWidth="2.4" />
           <line x1={trackStart} y1="242" x2={trackEnd} y2="242" stroke="#cbd5e1" strokeWidth="0.8" strokeDasharray="16 4" />
           <line x1={trackStart} y1="272" x2={trackEnd} y2="272" stroke="#475569" strokeWidth="2.4" />
           <line x1={trackStart} y1="272" x2={trackEnd} y2="272" stroke="#cbd5e1" strokeWidth="0.8" strokeDasharray="16 4" />
         </g>
 
-        {/* Marcadores visuais dos Limites Operacionais (aparecem com opacidade leve somente se o respectivo portêiner estiver ativo) */}
-        {scenario.showPortainers !== false && (
+        {/* Marcadores visuais dos Limites Operacionais (aparecem com opacidade leve somente no simulador quando ativo) */}
+        {!isPresentationMode && scenario.showPortainers !== false && (
           <g className="portainer-limit-markers" pointerEvents="none">
             {/* Limite P5 (Meio entre cabeços 297 e 296) - visível somente se P5 estiver ativo */}
             {isP5Active && p5LimitX !== null && p5LimitM !== undefined && (() => {
@@ -1576,7 +1623,7 @@ export default function BerthBlueprint({
         })}
 
         {/* Cotas em metros entre cabeços adjacentes (ex: 19,8, 10,7, 25,0, 30,0) como na planta portuária */}
-        {bollardDisplays.slice(0, -1).map((display, index) => {
+        {!isPresentationMode && bollardDisplays.slice(0, -1).map((display, index) => {
           const next = bollardDisplays[index + 1];
           if (!next) return null;
           const x1 = trackStart + display.position * scale;
@@ -1642,9 +1689,9 @@ export default function BerthBlueprint({
         }))}
 
         {/* Portêineres STS (P4, P5, P6, P7, P8, P9) */}
-        {scenario.showPortainers !== false &&
+        {(isPresentationMode || scenario.showPortainers !== false) &&
           (scenario.portainers ?? DEFAULT_PORTAINERS)
-            .filter((p) => p.enabled)
+            .filter((p) => isPresentationMode || p.enabled)
             .map((portainer) => {
               const isDragging = dragRef.current?.kind === "portainer" && dragRef.current.id === portainer.id;
               const isHovered = hoveredPortainerId === portainer.id;
@@ -1654,6 +1701,7 @@ export default function BerthBlueprint({
                 trackStart,
                 isHovered,
                 isDragging,
+                isPresentationMode,
                 onPointerDown: (event) => onPortainerPointerDown(event, portainer.id, portainer.position),
                 onPointerEnter: () => setHoveredPortainerId(portainer.id),
                 onPointerLeave: () => setHoveredPortainerId((curr) => (curr === portainer.id ? null : curr)),
@@ -1667,14 +1715,29 @@ export default function BerthBlueprint({
           return (
             <g key={segment.id}>
               <rect x={x} y="310" width={segmentWidth} height="43" fill={shade} stroke="#fff" strokeWidth="2" />
-              <text x={x + segmentWidth / 2} y="328" textAnchor="middle" className="segment-name">{segment.name.length > 20 ? `${segment.name.slice(0, 18)}…` : segment.name}</text>
-              <text x={x + segmentWidth / 2} y="345" textAnchor="middle" className="segment-length">{segment.length} m · {segment.start}–{segment.end} m</text>
+              <text
+                x={x + segmentWidth / 2}
+                y={isPresentationMode ? "336" : "328"}
+                textAnchor="middle"
+                className="segment-name"
+              >
+                {segment.name.length > 20 ? `${segment.name.slice(0, 18)}…` : segment.name}
+              </text>
+              {!isPresentationMode && (
+                <text x={x + segmentWidth / 2} y="345" textAnchor="middle" className="segment-length">
+                  {segment.length} m · {segment.start}–{segment.end} m
+                </text>
+              )}
             </g>
           );
         })}
-        <line x1={trackStart} y1="362" x2={trackEnd} y2="362" stroke="#94a7ad" strokeWidth="1" />
-        <text x={trackStart} y="376" className="blueprint-footnote">INÍCIO DO CAIS · coordenadas longitudinais em metros</text>
-        <text x={trackEnd} y="376" textAnchor="end" className="blueprint-footnote">{total} m · FIM DO CAIS</text>
+        {!isPresentationMode && (
+          <>
+            <line x1={trackStart} y1="362" x2={trackEnd} y2="362" stroke="#94a7ad" strokeWidth="1" />
+            <text x={trackStart} y="376" className="blueprint-footnote">INÍCIO DO CAIS · coordenadas longitudinais em metros</text>
+            <text x={trackEnd} y="376" textAnchor="end" className="blueprint-footnote">{total} m · FIM DO CAIS</text>
+          </>
+        )}
       </svg>
 
       {/* Card flutuante com foto real e dados ao passar o mouse pelo cabeço */}

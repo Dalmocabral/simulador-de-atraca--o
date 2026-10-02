@@ -893,15 +893,15 @@ export default function AddVesselModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#2d4b58] mb-1">
-                    Bordo de Atracação (Voltado para o Cais)
+                    Lado de atracação
                   </label>
                   <select
                     value={manualSide}
                     onChange={(e) => setManualSide(e.target.value as BerthingSide)}
                     className="w-full px-3 py-2 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a] bg-white"
                   >
-                    <option value="boreste">Boreste (BE) — Proa voltada para a direita</option>
-                    <option value="bombordo">Bombordo (BB) — Proa voltada para a esquerda</option>
+                    <option value="bombordo">Bombordo</option>
+                    <option value="boreste">Boreste</option>
                   </select>
                 </div>
 
