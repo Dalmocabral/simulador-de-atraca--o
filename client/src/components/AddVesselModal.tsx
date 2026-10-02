@@ -72,6 +72,7 @@ export default function AddVesselModal({
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
   const catalogImportRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Manual form state
   const [manualName, setManualName] = useState("");
@@ -81,6 +82,13 @@ export default function AddVesselModal({
   const [manualSide, setManualSide] = useState<BerthingSide>("boreste");
   const [manualColor, setManualColor] = useState<VesselColor>("blue");
   const [saveToCatalog, setSaveToCatalog] = useState(true);
+
+  // Reset any accidental scroll when switching tabs
+  useEffect(() => {
+    if (modalRef.current) {
+      modalRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
 
   // Load data when dialog opens
   useEffect(() => {
@@ -352,9 +360,15 @@ export default function AddVesselModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:!max-w-4xl md:!max-w-5xl w-[94vw] p-0 overflow-hidden bg-white border border-[#d6e2e6] rounded-xl shadow-2xl flex flex-col max-h-[88vh]">
-        {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-[#102d40] to-[#1a445d] text-white flex items-center justify-between">
+      <DialogContent
+        ref={modalRef}
+        className="sm:!max-w-4xl md:!max-w-5xl w-[94vw] !h-[88vh] !max-h-[88vh] !p-0 !gap-0 !flex !flex-col !overflow-hidden bg-white border border-[#d6e2e6] rounded-xl shadow-2xl"
+        onScroll={(e) => {
+          e.currentTarget.scrollTop = 0;
+        }}
+      >
+        {/* Header (pinned) */}
+        <div className="px-6 py-4 bg-gradient-to-r from-[#102d40] to-[#1a445d] text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
               <Ship className="w-5 h-5 text-cyan-300" />
@@ -372,8 +386,8 @@ export default function AddVesselModal({
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-[#e1e9ec] bg-[#f8fafb] px-6 gap-2 pt-2 overflow-x-auto">
+        {/* Tab Navigation (pinned) */}
+        <div className="flex border-b border-[#e1e9ec] bg-[#f8fafb] px-6 gap-2 pt-2 overflow-x-auto shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("praticagem")}
@@ -627,21 +641,21 @@ export default function AddVesselModal({
 
         {/* Tab 2: Saved Catalog (Offline / Permanent) */}
         {activeTab === "catalog" && (
-          <div className="flex-1 flex flex-col min-h-0 p-6 bg-white overflow-hidden">
-            {/* Catalog Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div className="relative flex-1 min-w-[260px]">
+          <div className="flex-1 min-h-0 flex flex-col p-5 bg-white overflow-hidden">
+            {/* Catalog Toolbar (shrink-0) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3 shrink-0">
+              <div className="relative flex-1">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
-                  placeholder="Buscar navio cadastrado no catálogo salvo por nome, IMO, tipo..."
-                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a]"
+                  placeholder="Buscar navio salvo por nome, IMO, tipo..."
+                  className="w-full pl-9 pr-3 py-2 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a] bg-white shadow-xs"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0 justify-end">
                 <input
                   type="file"
                   ref={catalogImportRef}
@@ -652,7 +666,7 @@ export default function AddVesselModal({
                 <button
                   type="button"
                   onClick={() => catalogImportRef.current?.click()}
-                  className="px-3 py-1.5 bg-[#f4f7f8] hover:bg-[#e7ecef] text-[#3e5661] border border-[#d2dde1] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-2 bg-[#f4f7f8] hover:bg-[#e7ecef] text-[#3e5661] border border-[#d2dde1] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   title="Importar catálogo de navios de um arquivo JSON"
                 >
                   <Upload className="w-3.5 h-3.5 text-gray-500" />
@@ -662,7 +676,7 @@ export default function AddVesselModal({
                 <button
                   type="button"
                   onClick={() => exportCatalogJson(catalog)}
-                  className="px-3 py-1.5 bg-[#f4f7f8] hover:bg-[#e7ecef] text-[#3e5661] border border-[#d2dde1] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-2 bg-[#f4f7f8] hover:bg-[#e7ecef] text-[#3e5661] border border-[#d2dde1] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   title="Exportar catálogo salvo como arquivo JSON"
                 >
                   <Download className="w-3.5 h-3.5 text-gray-500" />
@@ -672,7 +686,7 @@ export default function AddVesselModal({
             </div>
 
             {/* Catalog List */}
-            <div className="flex-1 overflow-y-auto border border-[#e1e9ec] rounded-lg divide-y divide-[#edf2f4]">
+            <div className="flex-1 min-h-0 overflow-y-auto border border-[#e1e9ec] rounded-lg divide-y divide-[#edf2f4]">
               {loadingCatalog ? (
                 <div className="p-12 text-center text-[#74878f] text-xs flex flex-col items-center gap-2">
                   <RefreshCw className="w-6 h-6 animate-spin text-[#16869a]" />
@@ -779,7 +793,7 @@ export default function AddVesselModal({
 
         {/* Tab 3: Manual Entry */}
         {activeTab === "manual" && (
-          <form onSubmit={handleManualSubmit} className="flex-1 p-6 bg-white overflow-y-auto">
+          <form onSubmit={handleManualSubmit} className="flex-1 min-h-0 p-6 bg-white overflow-y-auto">
             <div className="max-w-xl mx-auto space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#2d4b58] mb-1">
