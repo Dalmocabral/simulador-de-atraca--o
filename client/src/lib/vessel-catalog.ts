@@ -32,13 +32,53 @@ export interface PraticagemLiveResponse {
   maneuvers: PraticagemManeuver[];
 }
 
-const LOCAL_STORAGE_CATALOG_KEY = "caislab:vessels_catalog:v1";
+const LOCAL_STORAGE_CATALOG_KEY = "caislab:saved_vessels:v2";
 
 /**
- * Carrega a lista do catálogo permanente (unindo localStorage e arquivo público JSON).
+ * Verifica se a embarcação atraca no Terminal Rio (TECONTPROLONG ou TECONT1) ou se é cadastro manual.
+ * Descarta navios de outros berços da baía de Guanabara (CPBS, T-OIL, SUDESTE, ÁREA 11, etc.).
+ */
+export function isTerminalVessel(v: CatalogVessel): boolean {
+  if (!v.lastBerth) return true;
+  const b = v.lastBerth.trim().toUpperCase();
+  // Se tiver berço do terminal, aceita
+  if (b.includes("TECONTPROLONG") || b.includes("TECONT1")) return true;
+  // Rejeita explicitamente outros berços
+  if (
+    b.includes("CPBS") ||
+    b.includes("T-OIL") ||
+    b.includes("ÁREA") ||
+    b.includes("AREA") ||
+    b.includes("SUDESTE") ||
+    b.includes("T-MULT") ||
+    b.includes("CSN") ||
+    b.includes("COSAN") ||
+    b.includes("RNV") ||
+    b.includes("B-PORT") ||
+    b.includes("BPORT") ||
+    b.includes("TERNIUM") ||
+    b.includes("PP-") ||
+    b.includes("PG-") ||
+    b.includes("PS-") ||
+    b.includes("TOLEO") ||
+    b.includes("DOME") ||
+    b.includes("ALISEO")
+  ) {
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Carrega a lista de Navios Salvos do Terminal (unindo localStorage e arquivo público JSON).
  */
 export async function fetchVesselCatalog(): Promise<CatalogVessel[]> {
   const map = new Map<string, CatalogVessel>();
+
+  // Limpar cache legado com navios de outros berços
+  try {
+    localStorage.removeItem("caislab:vessels_catalog:v1");
+  } catch {}
 
   // 1. Tentar ler do arquivo / API
   try {
@@ -46,7 +86,7 @@ export async function fetchVesselCatalog(): Promise<CatalogVessel[]> {
     if (res.ok) {
       const data: CatalogVessel[] = await res.json();
       data.forEach((v) => {
-        if (v.name) map.set(v.name.trim().toUpperCase(), v);
+        if (v.name && isTerminalVessel(v)) map.set(v.name.trim().toUpperCase(), v);
       });
     } else {
       // Fallback para arquivo estático
@@ -54,18 +94,18 @@ export async function fetchVesselCatalog(): Promise<CatalogVessel[]> {
       if (fallbackRes.ok) {
         const data: CatalogVessel[] = await fallbackRes.json();
         data.forEach((v) => {
-          if (v.name) map.set(v.name.trim().toUpperCase(), v);
+          if (v.name && isTerminalVessel(v)) map.set(v.name.trim().toUpperCase(), v);
         });
       }
     }
   } catch (err) {
-    console.warn("Aviso ao buscar catálogo via API, usando fallback:", err);
+    console.warn("Aviso ao buscar navios salvos via API, usando fallback:", err);
     try {
       const fallbackRes = await fetch("/vessels_catalog.json", { cache: "no-store" });
       if (fallbackRes.ok) {
         const data: CatalogVessel[] = await fallbackRes.json();
         data.forEach((v) => {
-          if (v.name) map.set(v.name.trim().toUpperCase(), v);
+          if (v.name && isTerminalVessel(v)) map.set(v.name.trim().toUpperCase(), v);
         });
       }
     } catch {
@@ -79,11 +119,11 @@ export async function fetchVesselCatalog(): Promise<CatalogVessel[]> {
     if (localRaw) {
       const localData: CatalogVessel[] = JSON.parse(localRaw);
       localData.forEach((v) => {
-        if (v.name) map.set(v.name.trim().toUpperCase(), v);
+        if (v.name && isTerminalVessel(v)) map.set(v.name.trim().toUpperCase(), v);
       });
     }
   } catch (e) {
-    console.warn("Erro ao ler catálogo do localStorage:", e);
+    console.warn("Erro ao ler navios salvos do localStorage:", e);
   }
 
   const list = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));

@@ -37,6 +37,9 @@ import {
   type BerthingSide,
   type Vessel,
   type VesselColor,
+  type VesselType,
+  VESSEL_TYPE_LABELS,
+  normalizeVesselType,
   VESSEL_COLORS,
   makeId,
   normalizeMooringOffset,
@@ -81,6 +84,7 @@ export default function AddVesselModal({
   const [manualDraft, setManualDraft] = useState(10.5);
   const [manualSide, setManualSide] = useState<BerthingSide>("boreste");
   const [manualColor, setManualColor] = useState<VesselColor>("blue");
+  const [manualType, setManualType] = useState<VesselType>("container");
   const [saveToCatalog, setSaveToCatalog] = useState(true);
 
   // Reset any accidental scroll when switching tabs
@@ -189,6 +193,7 @@ export default function AddVesselModal({
     const side: BerthingSide = m.berthingSide === "bombordo" ? "bombordo" : "boreste";
     const position = calculateNextPosition(loa, m.berthTo);
     const color = getNextColor();
+    const vesselType = normalizeVesselType(m.type);
 
     const newVessel: Vessel = {
       id,
@@ -201,6 +206,7 @@ export default function AddVesselModal({
       gangwayOffset: loa / 2,
       mooringLines: [],
       color,
+      vesselType,
     };
 
     // Auto save to persistent catalog
@@ -211,7 +217,7 @@ export default function AddVesselModal({
       draft,
       berthingSide: side,
       imo: m.imo,
-      type: m.type,
+      type: m.type || VESSEL_TYPE_LABELS[vesselType],
       flag: m.flag,
       lastBerth: m.berthTo || m.berthFrom || "",
     };
@@ -220,7 +226,7 @@ export default function AddVesselModal({
 
     onAddVessel(
       newVessel,
-      `Navio "${m.name}" adicionado da escala do Terminal (${m.berthTo || "Tecon Rio"}, LOA ${loa}m, Boca ${beam}m, Calado ${draft}m) e gravado no catálogo.`
+      `Navio "${m.name}" (${VESSEL_TYPE_LABELS[vesselType]}) adicionado da escala do Terminal (${m.berthTo || "Tecon Rio"}, LOA ${loa}m, Boca ${beam}m, Calado ${draft}m) e gravado em Navios Salvos.`
     );
     onOpenChange(false);
   }
@@ -234,6 +240,7 @@ export default function AddVesselModal({
     const side: BerthingSide = v.berthingSide === "bombordo" ? "bombordo" : "boreste";
     const position = calculateNextPosition(loa);
     const color = getNextColor();
+    const vesselType = normalizeVesselType(v.type);
 
     const newVessel: Vessel = {
       id,
@@ -246,11 +253,12 @@ export default function AddVesselModal({
       gangwayOffset: loa / 2,
       mooringLines: [],
       color,
+      vesselType,
     };
 
     onAddVessel(
       newVessel,
-      `Navio "${v.name}" carregado do catálogo salvo (LOA ${loa}m, Boca ${beam}m, Calado ${draft}m).`
+      `Navio "${v.name}" (${VESSEL_TYPE_LABELS[vesselType]}) carregado de Navios Salvos (LOA ${loa}m, Boca ${beam}m, Calado ${draft}m).`
     );
     onOpenChange(false);
   }
@@ -276,6 +284,7 @@ export default function AddVesselModal({
       gangwayOffset: loa / 2,
       mooringLines: [],
       color: manualColor,
+      vesselType: manualType,
     };
 
     if (saveToCatalog) {
@@ -285,13 +294,14 @@ export default function AddVesselModal({
         beam,
         draft,
         berthingSide: manualSide,
+        type: VESSEL_TYPE_LABELS[manualType],
       });
       await loadCatalog();
     }
 
     onAddVessel(
       newVessel,
-      `Navio "${cleanName}" adicionado ao cenário${saveToCatalog ? " e registrado no catálogo permanente" : ""}.`
+      `Navio "${cleanName}" (${VESSEL_TYPE_LABELS[manualType]}) adicionado ao cenário${saveToCatalog ? " e gravado em Navios Salvos" : ""}.`
     );
     onOpenChange(false);
   }
@@ -416,7 +426,7 @@ export default function AddVesselModal({
             }`}
           >
             <Layers className="w-3.5 h-3.5 text-[#16869a] flex-shrink-0" />
-            <span>Catálogo Salvo (Histórico)</span>
+            <span>Navios Salvos</span>
             <span className="bg-cyan-100 text-cyan-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {catalog.length}
             </span>
@@ -634,15 +644,15 @@ export default function AddVesselModal({
             </div>
             <div className="mt-2.5 text-[10px] text-[#71858e] flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-[#16869a] flex-shrink-0" />
-              <span>Ao adicionar uma embarcação da Praticagem RJ, seus dados técnicos ficam automaticamente gravados no catálogo permanente para futuras simulações.</span>
+              <span>Navios que vão atracar no Terminal têm seus dados técnicos gravados automaticamente na lista de Navios Salvos.</span>
             </div>
           </div>
         )}
 
-        {/* Tab 2: Saved Catalog (Offline / Permanent) */}
+        {/* Tab 2: Saved Vessels (Navios Salvos do Terminal) */}
         {activeTab === "catalog" && (
           <div className="flex-1 min-h-0 flex flex-col p-5 bg-white overflow-hidden">
-            {/* Catalog Toolbar (shrink-0) */}
+            {/* Toolbar (shrink-0) */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3 shrink-0">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -667,7 +677,7 @@ export default function AddVesselModal({
                   type="button"
                   onClick={() => catalogImportRef.current?.click()}
                   className="px-3.5 py-2 bg-[#f4f7f8] hover:bg-[#e7ecef] text-[#3e5661] border border-[#d2dde1] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                  title="Importar catálogo de navios de um arquivo JSON"
+                  title="Importar lista de navios salvos de um arquivo JSON"
                 >
                   <Upload className="w-3.5 h-3.5 text-gray-500" />
                   <span>Importar JSON</span>
@@ -677,7 +687,7 @@ export default function AddVesselModal({
                   type="button"
                   onClick={() => exportCatalogJson(catalog)}
                   className="px-3.5 py-2 bg-[#f4f7f8] hover:bg-[#e7ecef] text-[#3e5661] border border-[#d2dde1] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                  title="Exportar catálogo salvo como arquivo JSON"
+                  title="Exportar navios salvos como arquivo JSON"
                 >
                   <Download className="w-3.5 h-3.5 text-gray-500" />
                   <span>Exportar JSON ({catalog.length})</span>
@@ -685,16 +695,16 @@ export default function AddVesselModal({
               </div>
             </div>
 
-            {/* Catalog List */}
+            {/* Saved Vessels List */}
             <div className="flex-1 min-h-0 overflow-y-auto border border-[#e1e9ec] rounded-lg divide-y divide-[#edf2f4]">
               {loadingCatalog ? (
                 <div className="p-12 text-center text-[#74878f] text-xs flex flex-col items-center gap-2">
                   <RefreshCw className="w-6 h-6 animate-spin text-[#16869a]" />
-                  <span>Carregando catálogo salvo...</span>
+                  <span>Carregando navios salvos...</span>
                 </div>
               ) : filteredCatalog.length === 0 ? (
                 <div className="p-12 text-center text-[#74878f] text-xs">
-                  {catalogSearch ? "Nenhum navio encontrado com essa busca." : "Nenhum navio salvo no catálogo ainda."}
+                  {catalogSearch ? "Nenhum navio encontrado com essa busca." : "Nenhum navio salvo ainda. Navios programados para o Terminal são adicionados automaticamente ao sincronizar."}
                 </div>
               ) : (
                 filteredCatalog.map((v) => (
@@ -763,13 +773,13 @@ export default function AddVesselModal({
                       <button
                         type="button"
                         onClick={async () => {
-                          if (confirm(`Remover "${v.name}" do catálogo permanente?`)) {
+                          if (confirm(`Remover "${v.name}" da lista de Navios Salvos?`)) {
                             const updated = await deleteVesselFromCatalog(v.name);
                             setCatalog(updated);
                           }
                         }}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remover do catálogo"
+                        title="Remover de Navios Salvos"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -865,6 +875,21 @@ export default function AddVesselModal({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-[#2d4b58] mb-1">
+                  Tipo de Embarcação (Planta Blueprint)
+                </label>
+                <select
+                  value={manualType}
+                  onChange={(e) => setManualType(e.target.value as VesselType)}
+                  className="w-full px-3 py-2 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a] bg-white font-medium text-[#1e293b]"
+                >
+                  <option value="container">Porta-Contêineres (Container Ship) — Baías de contêineres e castelo de ré</option>
+                  <option value="general-cargo">Carga Geral / Graneleiro (General Cargo Ship) — Porões com escotilhas e guindastes</option>
+                  <option value="tanker">Petroleiro / Químico (Chemical/Products Tanker) — Manifold, tubulações e domos</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#2d4b58] mb-1">
@@ -911,7 +936,7 @@ export default function AddVesselModal({
                     className="w-4 h-4 text-[#16869a] rounded border-gray-300 focus:ring-[#16869a]"
                   />
                   <span>
-                    Salvar automaticamente este navio no <strong>Catálogo Permanente</strong> para reutilizar em futuras simulações sem precisar recadastrar.
+                    Salvar automaticamente este navio na lista de <strong>Navios Salvos</strong> para reutilizar em futuras simulações sem precisar recadastrar.
                   </span>
                 </label>
               </div>

@@ -11,6 +11,8 @@ import {
   VESSEL_COLORS,
   type BollardType,
   BOLLARD_TYPES,
+  type VesselType,
+  VESSEL_TYPE_LABELS,
 } from "@/lib/berth-model";
 
 import {
@@ -36,6 +38,550 @@ const HEIGHT = 320;
 const QUAY_Y = 218;
 const CABLE_END_Y = 205;
 const VESSEL_BERTH_BOTTOM_Y = QUAY_Y - 55; // 55 px de distância do cais (metade dos 110 px)
+
+/** Renderiza o convés de um Porta-Contêineres com baías de contêineres e castelo de ré */
+function renderContainerDeck(
+  x: number,
+  y: number,
+  vesselWidth: number,
+  vesselHeight: number,
+  bowInset: number,
+  color: { fill: string; stroke: string },
+  vesselIndex: number
+) {
+  const cellRows = vesselHeight > 38 ? 3 : 2;
+  const cellColumns = Math.max(2, Math.min(24, Math.floor(vesselWidth / 22)));
+  const innerWidth = Math.max(0, vesselWidth - bowInset - 18);
+  const cellWidth = innerWidth / cellColumns;
+  const innerHeight = vesselHeight - 10;
+  const cellHeight = innerHeight / cellRows;
+  const houseX = x + Math.max(9, vesselWidth * 0.14);
+  const houseW = Math.max(28, vesselWidth * 0.13);
+  const houseH = Math.max(10, vesselHeight * 0.44);
+  const houseY = y + (vesselHeight - houseH) / 2;
+
+  return (
+    <g className="deck-container-ship">
+      {/* Baías de Contêineres */}
+      {Array.from({ length: cellRows }, (_, row) =>
+        Array.from({ length: cellColumns }, (_, column) => {
+          const cellX = x + 9 + column * cellWidth;
+          const cellY = y + 5 + row * cellHeight;
+          if (cellX + cellWidth > x + vesselWidth - bowInset - 3) return null;
+          // Deixar espaço para a superestrutura/passadiço
+          if (cellX + cellWidth > houseX && cellX < houseX + houseW) return null;
+          return (
+            <rect
+              key={`cont-${row}-${column}`}
+              x={cellX}
+              y={cellY}
+              width={Math.max(1, cellWidth - 2)}
+              height={Math.max(1, cellHeight - 2)}
+              rx="1.2"
+              fill={CONTAINER_COLORS[(row * 3 + column + vesselIndex) % CONTAINER_COLORS.length]}
+              stroke="#ffffff"
+              strokeWidth="0.75"
+            />
+          );
+        })
+      )}
+      {/* Quebra-ondas de proa */}
+      <path
+        d={`M ${x + vesselWidth - bowInset - 2} ${y + 3} L ${x + vesselWidth - 8} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset - 2} ${y + vesselHeight - 3}`}
+        fill="none"
+        stroke={color.stroke}
+        strokeWidth="1.5"
+      />
+      {/* Superestrutura / Passadiço */}
+      <rect
+        x={houseX}
+        y={houseY}
+        width={houseW}
+        height={houseH}
+        rx="2"
+        fill={color.fill}
+        stroke={color.stroke}
+        strokeWidth="1"
+        opacity="0.95"
+      />
+      {/* Asas do passadiço */}
+      <line
+        x1={houseX + houseW * 0.55}
+        y1={y + 2}
+        x2={houseX + houseW * 0.55}
+        y2={y + vesselHeight - 2}
+        stroke={color.stroke}
+        strokeWidth="1.2"
+        opacity="0.7"
+      />
+      <circle cx={houseX + houseW * 0.55} cy={y + vesselHeight / 2} r="1.8" fill="#ffffff" stroke={color.stroke} strokeWidth="0.8" />
+    </g>
+  );
+}
+
+/** Renderiza o convés de um Navio de Carga Geral (General Cargo Ship / Bulk Carrier) com porões, escotilhas e guindastes */
+function renderGeneralCargoDeck(
+  x: number,
+  y: number,
+  vesselWidth: number,
+  vesselHeight: number,
+  bowInset: number,
+  color: { fill: string; stroke: string }
+) {
+  // Superestrutura de ré e chaminé
+  const houseX = x + 7;
+  const houseW = Math.max(20, Math.min(48, vesselWidth * 0.15));
+  const houseH = Math.max(12, vesselHeight * 0.72);
+  const houseY = y + (vesselHeight - houseH) / 2;
+
+  // Área útil de carga
+  const cargoStartX = houseX + houseW + 5;
+  const cargoEndX = x + vesselWidth - bowInset - 6;
+  const cargoLength = Math.max(20, cargoEndX - cargoStartX);
+
+  // 3 a 5 porões conforme o comprimento do navio
+  const numHolds = vesselWidth > 260 ? 5 : vesselWidth > 150 ? 4 : 3;
+  const craneGap = Math.max(12, Math.min(24, cargoLength * 0.09));
+  const totalHoldLength = cargoLength - (numHolds - 1) * craneGap;
+  const holdW = Math.max(12, totalHoldLength / numHolds);
+  const holdH = Math.max(10, vesselHeight * 0.58);
+  const holdY = y + (vesselHeight - holdH) / 2;
+
+  return (
+    <g className="deck-general-cargo">
+      {/* Chapa base de aço do convés */}
+      <rect
+        x={cargoStartX - 3}
+        y={y + 3}
+        width={cargoLength + 6}
+        height={vesselHeight - 6}
+        fill="#e6ecf0"
+        opacity="0.8"
+      />
+
+      {/* Porões de Carga com Tampas de Escotilha Tipo Painel */}
+      {Array.from({ length: numHolds }, (_, i) => {
+        const hX = cargoStartX + i * (holdW + craneGap);
+        const panels = holdW > 24 ? 4 : 2;
+        const panelW = (holdW - 2) / panels;
+        return (
+          <g key={`hold-${i}`}>
+            {/* Braçola externa do porão (Coaming) */}
+            <rect
+              x={hX}
+              y={holdY}
+              width={holdW}
+              height={holdH}
+              rx="1.5"
+              fill="#3a4b5d"
+              stroke="#1e293b"
+              strokeWidth="1.1"
+            />
+            {/* Painéis da tampa de escotilha (Hatch cover panels) */}
+            {Array.from({ length: panels }, (_, p) => (
+              <rect
+                key={`panel-${p}`}
+                x={hX + 1 + p * panelW}
+                y={holdY + 1}
+                width={Math.max(1, panelW - 1)}
+                height={holdH - 2}
+                fill={p % 2 === 0 ? "#4f6277" : "#45566a"}
+                stroke="#687e95"
+                strokeWidth="0.5"
+                rx="0.5"
+              />
+            ))}
+            {/* Vinco transversal central */}
+            <line
+              x1={hX}
+              y1={holdY + holdH / 2}
+              x2={hX + holdW}
+              y2={holdY + holdH / 2}
+              stroke="#263442"
+              strokeWidth="0.7"
+              strokeDasharray="3 2"
+            />
+            {/* Etiqueta de identificação do porão */}
+            {holdW > 20 && (
+              <text
+                x={hX + holdW / 2}
+                y={holdY + holdH / 2 + 2.5}
+                textAnchor="middle"
+                fontSize="5.2px"
+                fontWeight="700"
+                fill="#cbd5e1"
+                opacity="0.85"
+                style={{ pointerEvents: "none", userSelect: "none" }}
+              >
+                P{i + 1}
+              </text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* Guindastes de Bordo (Deck Cranes) entre os porões */}
+      {Array.from({ length: numHolds - 1 }, (_, i) => {
+        const craneCenterX = cargoStartX + (i + 1) * holdW + i * craneGap + craneGap / 2;
+        const craneRadius = Math.min(4.6, vesselHeight * 0.16);
+        const boomLength = Math.min(holdW * 0.85, 24);
+        const boomDirection = i % 2 === 0 ? 1 : -1;
+        const boomEndX = craneCenterX + boomLength * boomDirection;
+        const boomEndY = y + vesselHeight / 2 + (i % 2 === 0 ? -2 : 2);
+
+        return (
+          <g key={`crane-${i}`}>
+            {/* Base da casaria do guindaste */}
+            <rect
+              x={craneCenterX - craneRadius - 1.2}
+              y={y + (vesselHeight - craneRadius * 2.6) / 2}
+              width={(craneRadius + 1.2) * 2}
+              height={craneRadius * 2.6}
+              rx="1"
+              fill="#cbd5e1"
+              stroke="#64748b"
+              strokeWidth="0.6"
+            />
+            {/* Coluna / Pedestal circular */}
+            <circle
+              cx={craneCenterX}
+              cy={y + vesselHeight / 2}
+              r={craneRadius}
+              fill="#f8fafc"
+              stroke="#1e293b"
+              strokeWidth="1.1"
+            />
+            {/* Cabine de comando do guindasteiro */}
+            <rect
+              x={craneCenterX - 2}
+              y={y + vesselHeight / 2 - 2}
+              width="4"
+              height="4"
+              rx="0.8"
+              fill="#e2e8f0"
+              stroke="#0f172a"
+              strokeWidth="0.8"
+            />
+            {/* Lança tubular amarela (Boom/Jib) de alta visibilidade */}
+            <line
+              x1={craneCenterX}
+              y1={y + vesselHeight / 2}
+              x2={boomEndX}
+              y2={boomEndY}
+              stroke="#f59e0b"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+            />
+            {/* Cabo de sustentação e moitão/gancho */}
+            <line
+              x1={craneCenterX}
+              y1={y + vesselHeight / 2}
+              x2={boomEndX}
+              y2={boomEndY}
+              stroke="#b45309"
+              strokeWidth="0.6"
+              strokeDasharray="2 1"
+            />
+            <circle cx={boomEndX} cy={boomEndY} r="1.2" fill="#1e293b" />
+          </g>
+        );
+      })}
+
+      {/* Castelo de Proa com molinetes e guinchos */}
+      <path
+        d={`M ${x + vesselWidth - bowInset} ${y + 3} L ${x + vesselWidth - 5} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset} ${y + vesselHeight - 3} Z`}
+        fill="#cbd5e1"
+        stroke="#64748b"
+        strokeWidth="0.8"
+      />
+      <circle cx={x + vesselWidth - bowInset / 2} cy={y + vesselHeight * 0.35} r="1.6" fill="#475569" stroke="#1e293b" strokeWidth="0.6" />
+      <circle cx={x + vesselWidth - bowInset / 2} cy={y + vesselHeight * 0.65} r="1.6" fill="#475569" stroke="#1e293b" strokeWidth="0.6" />
+
+      {/* Superestrutura de Ré / Passadiço */}
+      <rect
+        x={houseX}
+        y={houseY}
+        width={houseW}
+        height={houseH}
+        rx="2"
+        fill={color.fill}
+        stroke={color.stroke}
+        strokeWidth="1.2"
+      />
+      {/* Asas do passadiço */}
+      <line
+        x1={houseX + houseW * 0.72}
+        y1={y + 2}
+        x2={houseX + houseW * 0.72}
+        y2={y + vesselHeight - 2}
+        stroke={color.stroke}
+        strokeWidth="1.4"
+      />
+      {/* Chaminé */}
+      <ellipse
+        cx={houseX + houseW * 0.28}
+        cy={y + vesselHeight / 2}
+        rx={Math.max(2.5, houseW * 0.14)}
+        ry={Math.max(2, vesselHeight * 0.12)}
+        fill="#1e293b"
+        stroke="#0f172a"
+        strokeWidth="0.8"
+      />
+      {/* Botes salva-vidas fechados em laranja */}
+      <rect x={houseX + 2} y={y + 1} width={Math.max(6, houseW * 0.3)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
+      <rect x={houseX + 2} y={y + vesselHeight - 3.2} width={Math.max(6, houseW * 0.3)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
+    </g>
+  );
+}
+
+/** Renderiza o convés de um Navio Tanque (Chemical/Products Tanker) com manifold central, tubulações, domos de carga e guindaste de mangotes */
+function renderTankerDeck(
+  x: number,
+  y: number,
+  vesselWidth: number,
+  vesselHeight: number,
+  bowInset: number,
+  color: { fill: string; stroke: string }
+) {
+  // Superestrutura de ré encostada no espelho de popa
+  const houseX = x + 5;
+  const houseW = Math.max(18, Math.min(46, vesselWidth * 0.14));
+  const houseH = Math.max(14, vesselHeight * 0.78);
+  const houseY = y + (vesselHeight - houseH) / 2;
+
+  // Área dos tanques de carga
+  const tankStartX = houseX + houseW + 4;
+  const tankEndX = x + vesselWidth - bowInset - 4;
+  const tankLength = Math.max(20, tankEndX - tankStartX);
+
+  // Número de compartimentos de tanques
+  const numTanks = vesselWidth > 260 ? 6 : vesselWidth > 140 ? 5 : 4;
+  const tankSecW = tankLength / numTanks;
+
+  // Passadiço elevado central e rack de tubulações
+  const trunkH = Math.max(5.5, Math.min(10, vesselHeight * 0.22));
+  const trunkY = y + (vesselHeight - trunkH) / 2;
+
+  // Estação do Manifold de Carga a meia-nau (50% do LOA)
+  const manifoldX = x + vesselWidth * 0.50;
+  const manifoldW = Math.max(12, Math.min(22, vesselWidth * 0.055));
+
+  return (
+    <g className="deck-tanker">
+      {/* Chapa base do convés de tanques */}
+      <rect
+        x={tankStartX}
+        y={y + 3}
+        width={tankLength}
+        height={vesselHeight - 6}
+        fill="#dae4ec"
+        stroke="#94a3b8"
+        strokeWidth="0.6"
+      />
+
+      {/* Cavernas transversais de tanques e Domos de Inspeção */}
+      {Array.from({ length: numTanks }, (_, i) => {
+        const tX = tankStartX + i * tankSecW;
+        const midX = tX + tankSecW / 2;
+        const domeR = Math.min(2.7, vesselHeight * 0.08);
+
+        return (
+          <g key={`tank-${i}`}>
+            {/* Divisória transversal entre tanques de carga */}
+            {i > 0 && (
+              <line
+                x1={tX}
+                y1={y + 3}
+                x2={tX}
+                y2={y + vesselHeight - 3}
+                stroke="#64748b"
+                strokeWidth="0.8"
+                strokeDasharray="3 2"
+              />
+            )}
+            {/* Domo do tanque de Bombordo e Válvula P/V */}
+            <circle
+              cx={midX}
+              cy={y + (trunkY - y) / 2 + 1}
+              r={domeR}
+              fill="#ffffff"
+              stroke="#334155"
+              strokeWidth="0.9"
+            />
+            <circle cx={midX + 2.5} cy={y + (trunkY - y) / 2 + 1} r="0.9" fill="#dc2626" />
+
+            {/* Domo do tanque de Boreste e Válvula P/V */}
+            <circle
+              cx={midX}
+              cy={trunkY + trunkH + (y + vesselHeight - trunkY - trunkH) / 2 - 1}
+              r={domeR}
+              fill="#ffffff"
+              stroke="#334155"
+              strokeWidth="0.9"
+            />
+            <circle cx={midX + 2.5} cy={trunkY + trunkH + (y + vesselHeight - trunkY - trunkH) / 2 - 1} r="0.9" fill="#dc2626" />
+          </g>
+        );
+      })}
+
+      {/* Passadiço Central Elevado (Trunk / Catwalk) */}
+      <rect
+        x={tankStartX}
+        y={trunkY}
+        width={tankLength}
+        height={trunkH}
+        fill="#94a3b8"
+        stroke="#475569"
+        strokeWidth="0.8"
+      />
+
+      {/* Tubulações de Convés Padronizadas por Cores */}
+      {/* 1. Gás Inerte / Linha de Retorno de Vapores (Amarelo) */}
+      <line
+        x1={tankStartX}
+        y1={trunkY + 1.2}
+        x2={tankStartX + tankLength}
+        y2={trunkY + 1.2}
+        stroke="#facc15"
+        strokeWidth="0.9"
+      />
+      {/* 2. Tubulação de Carga Principal (Vinho escuro) */}
+      <line
+        x1={tankStartX}
+        y1={trunkY + trunkH * 0.35}
+        x2={tankStartX + tankLength}
+        y2={trunkY + trunkH * 0.35}
+        stroke="#991b1b"
+        strokeWidth="1.2"
+      />
+      {/* 3. Tubulação de Produtos / Químicos (Azul) */}
+      <line
+        x1={tankStartX}
+        y1={trunkY + trunkH * 0.65}
+        x2={tankStartX + tankLength}
+        y2={trunkY + trunkH * 0.65}
+        stroke="#0284c7"
+        strokeWidth="1.1"
+      />
+      {/* 4. Linha de Incêndio e Lavagem (Vermelho vivo) */}
+      <line
+        x1={tankStartX}
+        y1={trunkY + trunkH - 1.2}
+        x2={tankStartX + tankLength}
+        y2={trunkY + trunkH - 1.2}
+        stroke="#ef4444"
+        strokeWidth="0.8"
+      />
+
+      {/* Manifold de Carga a Meia-Nau (Bandeja de Contenção Amarela e Flanges) */}
+      <rect
+        x={manifoldX - manifoldW / 2}
+        y={y + 1.5}
+        width={manifoldW}
+        height={vesselHeight - 3}
+        rx="1"
+        fill="#fef08a"
+        stroke="#ca8a04"
+        strokeWidth="1.2"
+      />
+      {/* Conexões transversais de válvulas no manifold */}
+      <line
+        x1={manifoldX - 3}
+        y1={y + 2}
+        x2={manifoldX - 3}
+        y2={y + vesselHeight - 2}
+        stroke="#991b1b"
+        strokeWidth="1.6"
+      />
+      <line
+        x1={manifoldX}
+        y1={y + 2}
+        x2={manifoldX}
+        y2={y + vesselHeight - 2}
+        stroke="#0284c7"
+        strokeWidth="1.6"
+      />
+      <line
+        x1={manifoldX + 3}
+        y1={y + 2}
+        x2={manifoldX + 3}
+        y2={y + vesselHeight - 2}
+        stroke="#facc15"
+        strokeWidth="1.4"
+      />
+      {/* Flanges de conexão em terra (Boreste e Bombordo) */}
+      <rect x={manifoldX - 4.5} y={y + 0.5} width="9" height="2" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+      <rect x={manifoldX - 4.5} y={y + vesselHeight - 2.5} width="9" height="2" fill="#b91c1c" stroke="#450a0a" strokeWidth="0.5" />
+
+      {/* Guindaste de Mangotes (Hose Handling Crane) ao lado do Manifold */}
+      <g>
+        <circle
+          cx={manifoldX + manifoldW / 2 + 3.5}
+          cy={y + vesselHeight / 2}
+          r="2.8"
+          fill="#f8fafc"
+          stroke="#0f172a"
+          strokeWidth="1"
+        />
+        {/* Lança amarela operando sobre o manifold */}
+        <line
+          x1={manifoldX + manifoldW / 2 + 3.5}
+          y1={y + vesselHeight / 2}
+          x2={manifoldX - 2}
+          y2={y + 4}
+          stroke="#f59e0b"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <circle cx={manifoldX - 2} cy={y + 4} r="1" fill="#1e293b" />
+      </g>
+
+      {/* Proa com guinchos de manobra */}
+      <path
+        d={`M ${x + vesselWidth - bowInset} ${y + 3} L ${x + vesselWidth - 4} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset} ${y + vesselHeight - 3} Z`}
+        fill="#cbd5e1"
+        stroke="#64748b"
+        strokeWidth="0.8"
+      />
+      <circle cx={x + vesselWidth - bowInset / 2} cy={y + vesselHeight * 0.35} r="1.6" fill="#475569" stroke="#1e293b" strokeWidth="0.6" />
+      <circle cx={x + vesselWidth - bowInset / 2} cy={y + vesselHeight * 0.65} r="1.6" fill="#475569" stroke="#1e293b" strokeWidth="0.6" />
+
+      {/* Superestrutura de Ré / Passadiço */}
+      <rect
+        x={houseX}
+        y={houseY}
+        width={houseW}
+        height={houseH}
+        rx="2"
+        fill={color.fill}
+        stroke={color.stroke}
+        strokeWidth="1.2"
+      />
+      {/* Asas do passadiço */}
+      <line
+        x1={houseX + houseW * 0.74}
+        y1={y + 2}
+        x2={houseX + houseW * 0.74}
+        y2={y + vesselHeight - 2}
+        stroke={color.stroke}
+        strokeWidth="1.6"
+      />
+      {/* Chaminé da praça de máquinas */}
+      <ellipse
+        cx={houseX + houseW * 0.28}
+        cy={y + vesselHeight / 2}
+        rx={Math.max(2.5, houseW * 0.15)}
+        ry={Math.max(2, vesselHeight * 0.13)}
+        fill="#1e293b"
+        stroke="#0f172a"
+        strokeWidth="0.8"
+      />
+      {/* Botes salva-vidas totalmente fechados */}
+      <rect x={houseX + 2} y={y + 1} width={Math.max(6, houseW * 0.32)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
+      <rect x={houseX + 2} y={y + vesselHeight - 3.2} width={Math.max(6, houseW * 0.32)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
+    </g>
+  );
+}
 
 export default function BerthBlueprint({
   scenario,
@@ -256,12 +802,7 @@ export default function BerthBlueprint({
           const messages = issueByVessel.get(vessel.id) ?? [];
           const isIssue = messages.length > 0;
           const isSelected = selectedVesselId === vessel.id;
-          const cellRows = vesselHeight > 38 ? 3 : 2;
-          const cellColumns = Math.max(2, Math.min(24, Math.floor(vessel.loa / 20)));
-          const innerWidth = Math.max(0, vesselWidth - bowInset - 18);
-          const cellWidth = innerWidth / cellColumns;
-          const innerHeight = vesselHeight - 10;
-          const cellHeight = innerHeight / cellRows;
+          const vesselType = vessel.vesselType ?? "container";
 
           return (
             <g
@@ -269,7 +810,7 @@ export default function BerthBlueprint({
               className={`ship-drag-group ${isSelected ? "is-selected" : ""} ${isIssue ? "has-issue" : ""}`}
               role="button"
               tabIndex={0}
-              aria-label={`${vessel.name}, ${vessel.loa} metros. Arraste para reposicionar.`}
+              aria-label={`${vessel.name}, ${VESSEL_TYPE_LABELS[vesselType]}, ${vessel.loa} metros. Arraste para reposicionar.`}
               onPointerDown={(event) => onPointerDown(event, vessel.id, vessel.position)}
               onKeyDown={(event) => {
                 if (event.key === "ArrowLeft") { event.preventDefault(); onMoveVessel(vessel.id, vessel.position - 5); }
@@ -279,7 +820,7 @@ export default function BerthBlueprint({
               style={{ cursor: dragRef.current ? "grabbing" : "grab" }}
             >
               <title>
-                {vessel.name} · LOA {vessel.loa} m · posição {vessel.position.toFixed(1)} m
+                {vessel.name} · {VESSEL_TYPE_LABELS[vesselType]} · LOA {vessel.loa} m · posição {vessel.position.toFixed(1)} m
                 {messages.length ? ` · ${messages.join("; ")}` : ""}
               </title>
               {isSelected && <rect x={x - 5} y={y - 25} width={Math.max(18, vesselWidth + 10)} height={vesselHeight + 37} rx="9" fill="none" stroke="#16869a" strokeWidth="1.5" strokeDasharray="4 4" />}
@@ -288,17 +829,18 @@ export default function BerthBlueprint({
                 {vessel.name.length > 26 ? `${vessel.name.slice(0, 24)}…` : vessel.name}
               </text>
               <g transform={vessel.berthingSide === "bombordo" ? `translate(${2 * x + vesselWidth}, 0) scale(-1, 1)` : undefined}>
+                {/* Casco exterior hidrodinâmico */}
                 <path d={`M ${x + 6} ${y} Q ${x} ${y + vesselHeight / 2} ${x + 6} ${y + vesselHeight} L ${x + vesselWidth - bowInset} ${y + vesselHeight} L ${x + vesselWidth} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset} ${y} Z`} fill="#f7fafb" stroke={isIssue ? "#bd4540" : color.stroke} strokeWidth={isIssue ? 3 : 2} strokeDasharray={isIssue ? "7 4" : undefined} />
-                {Array.from({ length: cellRows }, (_, row) =>
-                  Array.from({ length: cellColumns }, (_, column) => {
-                    const cellX = x + 9 + column * cellWidth;
-                    const cellY = y + 5 + row * cellHeight;
-                    if (cellX + cellWidth > x + vesselWidth - bowInset - 3) return null;
-                    return <rect key={`${row}-${column}`} x={cellX} y={cellY} width={Math.max(1, cellWidth - 2)} height={Math.max(1, cellHeight - 2)} rx="1.2" fill={CONTAINER_COLORS[(row * 3 + column + index) % CONTAINER_COLORS.length]} stroke="#fff" strokeWidth="0.75" />;
-                  }),
-                )}
-                <path d={`M ${x + vesselWidth - bowInset - 2} ${y + 3} L ${x + vesselWidth - 8} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset - 2} ${y + vesselHeight - 3}`} fill="none" stroke={color.stroke} strokeWidth="1.5" />
-                <rect x={x + Math.max(9, vesselWidth * 0.14)} y={y + Math.max(5, vesselHeight * 0.28)} width={Math.max(31, vesselWidth * 0.14)} height={Math.max(10, vesselHeight * 0.44)} rx="2" fill={color.fill} stroke={color.stroke} strokeWidth="1" opacity="0.94" />
+                
+                {/* Visualização detalhada do convés conforme tipo de navio */}
+                {vesselType === "general-cargo"
+                  ? renderGeneralCargoDeck(x, y, vesselWidth, vesselHeight, bowInset, color)
+                  : vesselType === "tanker"
+                  ? renderTankerDeck(x, y, vesselWidth, vesselHeight, bowInset, color)
+                  : renderContainerDeck(x, y, vesselWidth, vesselHeight, bowInset, color, index)
+                }
+
+                {/* Faixa de costado junto ao cais */}
                 <line x1={x + 7} y1={y + vesselHeight - 1} x2={x + vesselWidth - bowInset} y2={y + vesselHeight - 1} stroke={vessel.berthingSide === "bombordo" ? "#7566a8" : "#18849a"} strokeWidth="2" />
               </g>
               <line x1={x + vesselWidth / 2} y1={y + vesselHeight + 1} x2={x + vesselWidth / 2} y2={QUAY_Y - 4} stroke={isIssue ? "#bd4540" : color.stroke} strokeDasharray="3 4" opacity="0.58" />

@@ -59,6 +59,9 @@ import {
   type Scenario,
   type Vessel,
   type VesselColor,
+  type VesselType,
+  VESSEL_TYPE_LABELS,
+  normalizeVesselType,
 } from "@/lib/berth-model";
 
 function metres(value: number) {
@@ -408,8 +411,8 @@ export default function Simulator() {
               </div>
             </DialogContent>
           </Dialog>
-          <button className="button button-quiet" type="button" onClick={() => setIsAddVesselModalOpen(true)} title="Consultar chegadas da Praticagem RJ ou catálogo salvo">
-            <Radio size={14} className="text-emerald-600" /> <span>Praticagem RJ / Catálogo</span>
+          <button className="button button-quiet" type="button" onClick={() => setIsAddVesselModalOpen(true)} title="Consultar chegadas da Praticagem RJ ou navios salvos">
+            <Radio size={14} className="text-emerald-600" /> <span>Praticagem RJ / Navios Salvos</span>
           </button>
           <button className="button button-quiet" type="button" onClick={exportScenario} title="Baixar cenário como JSON">
             <Download size={16} /> <span>Exportar</span>
@@ -504,9 +507,11 @@ export default function Simulator() {
             />
 
             <div className="blueprint-legend">
-              <span><i className="legend-ship" /> Navio</span>
+              <span><i className="legend-ship" /> Porta-contêineres</span>
+              <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 10, height: 7, background: "#4f6277", border: "1px solid #1e293b", borderRadius: 1 }} /> Carga Geral</span>
+              <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 10, height: 7, background: "#fef08a", border: "1px solid #ca8a04", borderRadius: 1 }} /> Petroleiro</span>
               <span><i className="legend-quay" /> Trecho de cais</span>
-              <span><i className="legend-gap" /> Afastamento medido</span>
+              <span><i className="legend-gap" /> Afastamento</span>
               <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 8, height: 12, background: "#3a7ebf", borderRadius: 2 }} /> Duplo</span>
               <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 8, height: 12, background: "#6c757d", borderRadius: 2 }} /> Alto novo</span>
               <span className="inline-flex items-center gap-1.5"><i style={{ display: "inline-block", width: 8, height: 12, background: "#d62828", borderRadius: 2 }} /> Avariado</span>
@@ -531,12 +536,13 @@ export default function Simulator() {
               {scenario.vessels.map((vessel) => {
                 const selected = selectedVesselId === vessel.id;
                 const vesselIssues = issues.filter((issue) => issue.vesselId === vessel.id);
+                const typeLabel = vessel.vesselType === "general-cargo" ? "Carga Geral" : vessel.vesselType === "tanker" ? "Petroleiro" : "Contêiner";
                 return (
                   <button key={vessel.id} type="button" className={`vessel-list-item ${selected ? "vessel-list-item-selected" : ""}`} onClick={() => setSelectedVesselId(vessel.id)}>
                     <span className="vessel-color-chip" style={{ background: VESSEL_COLORS[vessel.color].fill }} />
                     <span className="vessel-list-copy">
                       <strong>{vessel.name || "Navio sem nome"}</strong>
-                      <small>{Math.round(vessel.loa)} m LOA <span>·</span> {vesselSectionName(vessel, scenario.segments)}</small>
+                      <small>{Math.round(vessel.loa)} m LOA <span>·</span> <span className="font-semibold text-[#16869a]">{typeLabel}</span> <span>·</span> {vesselSectionName(vessel, scenario.segments)}</small>
                     </span>
                     {vesselIssues.length > 0 && <span className="list-warning-dot" title={vesselIssues[0].message}><AlertTriangle size={15} /></span>}
                     {vesselIssues.length === 0 && <span className="list-check-dot"><CheckCircle2 size={15} /></span>}
@@ -564,14 +570,30 @@ export default function Simulator() {
                         beam: selectedVessel.beam,
                         draft: selectedVessel.draft,
                         berthingSide: selectedVessel.berthingSide,
+                        type: VESSEL_TYPE_LABELS[selectedVessel.vesselType ?? "container"],
                       });
-                      setNotice(`Navio "${selectedVessel.name}" salvo no catálogo permanente.`);
+                      setNotice(`Navio "${selectedVessel.name}" (${VESSEL_TYPE_LABELS[selectedVessel.vesselType ?? "container"]}) gravado em Navios Salvos.`);
                     }}
                     className="button button-quiet text-[10px] px-2 h-[34px] text-[#16869a]"
-                    title="Gravar este navio no catálogo permanente para futuras simulações"
+                    title="Gravar este navio na lista de Navios Salvos para futuras simulações"
                   >
-                    <Save size={13} /> Gravar no catálogo
+                    <Save size={13} /> Gravar em Navios Salvos
                   </button>
+                </div>
+
+                <div className="berthing-side-field mt-3 mb-2">
+                  <label className="field-label" htmlFor="vessel-type-select">Tipo de embarcação (Planta Blueprint)</label>
+                  <select
+                    id="vessel-type-select"
+                    className="side-select"
+                    value={selectedVessel.vesselType ?? "container"}
+                    onChange={(event) => patchVessel(selectedVessel.id, { vesselType: event.target.value as VesselType })}
+                  >
+                    <option value="container">Porta-Contêineres (Container Ship)</option>
+                    <option value="general-cargo">Carga Geral / Graneleiro (General Cargo Ship)</option>
+                    <option value="tanker">Petroleiro / Químico (Chemical/Products Tanker)</option>
+                  </select>
+                  <p className="form-hint">Alterna a planta blueprint do convés (baías de contêineres, escotilhas e guindastes, ou manifold e tubulações).</p>
                 </div>
 
                 <div className="field-row">

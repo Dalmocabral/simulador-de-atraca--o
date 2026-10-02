@@ -40,6 +40,48 @@ export interface MooringLine {
   bollardId: string | null;
 }
 
+export type VesselType = "container" | "general-cargo" | "tanker";
+
+export const VESSEL_TYPE_LABELS: Record<VesselType, string> = {
+  "container": "Porta-Contêineres (Container Ship)",
+  "general-cargo": "Carga Geral / Graneleiro (General Cargo Ship)",
+  "tanker": "Petroleiro / Químico (Tanker)",
+};
+
+export function normalizeVesselType(raw?: string | null): VesselType {
+  if (!raw) return "container";
+  const upper = raw.toUpperCase().trim();
+  if (
+    upper === "tanker" ||
+    upper.includes("TANKER") ||
+    upper.includes("CHEMICAL") ||
+    upper.includes("OIL") ||
+    upper.includes("PETROLEIRO") ||
+    upper.includes("QUÍMICO") ||
+    upper.includes("QUIMICO") ||
+    upper.includes("GAS") ||
+    upper.includes("LPG") ||
+    upper.includes("LNG") ||
+    upper.includes("BITUMEN") ||
+    upper.includes("ASPHALT")
+  ) {
+    return "tanker";
+  }
+  if (
+    upper === "general-cargo" ||
+    upper.includes("GENERAL CARGO") ||
+    upper.includes("CARGO SHIP") ||
+    upper.includes("CARGA GERAL") ||
+    upper.includes("BULK") ||
+    upper.includes("GRANELEIRO") ||
+    upper.includes("ORE CARRIER") ||
+    upper.includes("CARRIER")
+  ) {
+    return "general-cargo";
+  }
+  return "container";
+}
+
 export interface Vessel {
   id: string;
   name: string;
@@ -53,6 +95,7 @@ export interface Vessel {
   gangwayOffset: number;
   mooringLines: MooringLine[];
   color: VesselColor;
+  vesselType?: VesselType;
 }
 
 export interface Scenario {
@@ -256,6 +299,7 @@ export function createDemoScenario(): Scenario {
         gangwayOffset: 168,
         mooringLines: [],
         color: "blue",
+        vesselType: "container",
       },
       {
         id: "vessel-vermilion",
@@ -268,6 +312,7 @@ export function createDemoScenario(): Scenario {
         gangwayOffset: 130,
         mooringLines: [],
         color: "orange",
+        vesselType: "general-cargo",
       },
     ],
     bollards: createBollardInventory(),
@@ -316,6 +361,7 @@ export function normalizeScenario(value: unknown): Scenario | null {
       ? raw.color as VesselColor
       : (["blue", "teal", "orange", "violet"] as VesselColor[])[index % 4];
     const gangway = typeof raw.gangwayOffset === "number" && Number.isFinite(raw.gangwayOffset) ? raw.gangwayOffset : loa / 2;
+    const vesselType = normalizeVesselType(typeof raw.vesselType === "string" ? raw.vesselType : typeof raw.type === "string" ? raw.type : undefined);
     vessels.push({
       id: typeof raw.id === "string" && raw.id ? raw.id : makeId("navio"),
       name: raw.name,
@@ -327,6 +373,7 @@ export function normalizeScenario(value: unknown): Scenario | null {
       gangwayOffset: Math.min(loa, Math.max(0, gangway)),
       mooringLines,
       color,
+      vesselType,
     });
   }
 

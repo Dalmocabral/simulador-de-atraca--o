@@ -40,26 +40,38 @@ def to_float(val):
     except Exception:
         return 0.0
 
+def is_terminal_berth(berth):
+    if not berth:
+        return False
+    b = str(berth).strip().upper()
+    return "TECONTPROLONG" in b or "TECONT1" in b
+
 def run_sync():
     workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     public_dir = os.path.join(workspace_root, "client", "public")
     os.makedirs(public_dir, exist_ok=True)
     catalog_path = os.path.join(public_dir, "vessels_catalog.json")
+    root_catalog_path = os.path.join(workspace_root, "vessels_catalog.json")
     live_path = os.path.join(public_dir, "praticagem_live.json")
 
-    # 1. Carregar catálogo existente
+    # 1. Carregar lista existente de navios salvos, mantendo EXCLUSIVAMENTE navios do Terminal
     catalog = {}
     if os.path.exists(catalog_path):
         try:
             with open(catalog_path, "r", encoding="utf-8") as f:
                 saved = json.load(f)
                 for v in saved:
-                    if v.get("name"):
-                        catalog[v["name"].strip().upper()] = v
+                    name = v.get("name", "").strip().upper()
+                    if not name:
+                        continue
+                    last_berth = v.get("lastBerth", "")
+                    # Filtra estritamente: Somente navios com atracação no Terminal (TECONTPROLONG ou TECONT1) ou criados manualmente
+                    if is_terminal_berth(last_berth) or (not last_berth and v.get("loa", 0) > 0):
+                        catalog[name] = v
         except Exception as e:
-            print(f"Aviso ao carregar catálogo: {e}", file=sys.stderr)
+            print(f"Aviso ao carregar navios salvos: {e}", file=sys.stderr)
 
-    # 2. Carregar navios de praticagem_dashboard local (apenas terminal Rio)
+    # 2. Carregar navios do praticagem_dashboard local (somente terminal Rio)
     dash_path = r"D:\Programação\praticagem_dashboard\public\data.json"
     if os.path.exists(dash_path):
         try:
@@ -67,10 +79,9 @@ def run_sync():
                 dash_data = json.load(f)
                 dash_navios = dash_data.get("navios", [])
                 for n in dash_navios:
-                    # Filtra apenas navios do terminal rio que vão atracar (ou seja, terminal rio)
                     terminal = n.get("terminal", "")
                     beco = n.get("beco", "")
-                    if terminal == "rio" or "TECONTPROLONG" in beco or "TECONT1" in beco:
+                    if is_terminal_berth(beco) or (terminal == "rio" and ("PROLONG" in beco.upper() or "TECON" in beco.upper())):
                         name = n.get("navio", "").strip().upper()
                         if not name:
                             continue
@@ -124,12 +135,14 @@ def run_sync():
                 manobra = cols[7].get_text(strip=True)
 
                 becos_combined = f"{beco_origem} {beco_destino}".upper()
-                is_terminal_rio = "TECONTPROLONG" in becos_combined or "TECONT1" in becos_combined
+                
+                # Filtro rigoroso: Navios que vão ATRACAR no Terminal (TECONTPROLONG ou TECONT1)
+                # Descarta saídas para fora do terminal
+                if manobra == "S" and not is_terminal_berth(beco_destino):
+                    continue
 
-                # Filtro: Pertence ao Terminal Rio e é manobra de ATRACAÇÃO (Entrada 'E' ou berço destino no terminal)
-                is_berthing = (manobra == "E") or ("TECONTPROLONG" in beco_destino or "TECONT1" in beco_destino)
-
-                if not (is_terminal_rio and is_berthing):
+                is_berthing = is_terminal_berth(beco_destino) or (manobra == "E" and is_terminal_berth(becos_combined))
+                if not is_berthing:
                     continue
 
                 # Extrai nome limpo do navio
@@ -181,20 +194,32 @@ def run_sync():
                 }
                 live_maneuvers.append(m_data)
 
-                # Salva no catálogo permanente
+                # Verifica se o navio já está na lista de Navios Salvos; se não estiver, grava os dados
                 if name_clean and n_loa > 0:
-                    catalog[name_clean] = {
-                        "name": name_clean,
-                        "loa": n_loa,
-                        "beam": n_beam,
-                        "draft": n_draft if n_draft > 0 else (catalog.get(name_clean, {}).get("draft") or 11.0),
-                        "berthingSide": side,
-                        "imo": imo or catalog.get(name_clean, {}).get("imo") or "",
-                        "type": tipo or catalog.get(name_clean, {}).get("type") or "CONTAINER SHIP",
-                        "flag": bandeira or catalog.get(name_clean, {}).get("flag") or "",
-                        "lastBerth": destination_berth,
-                        "updatedAt": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    }
+                    if name_clean not in catalog:
+                        catalog[name_clean] = {
+                            "name": name_clean,
+                            "loa": n_loa,
+                            "beam": n_beam,
+                            "draft": n_draft if n_draft > 0 else 11.0,
+                            "berthingSide": side,
+                            "imo": imo,
+                            "type": tipo or "CONTAINER SHIP",
+                            "flag": bandeira,
+                            "lastBerth": destination_berth,
+                            "updatedAt": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        }
+                    else:
+                        existing = catalog[name_clean]
+                        if n_loa > 0: existing["loa"] = n_loa
+                        if n_beam > 0: existing["beam"] = n_beam
+                        if n_draft > 0: existing["draft"] = n_draft
+                        if side: existing["berthingSide"] = side
+                        if imo: existing["imo"] = imo
+                        if tipo: existing["type"] = tipo
+                        if bandeira: existing["flag"] = bandeira
+                        if destination_berth: existing["lastBerth"] = destination_berth
+                        existing["updatedAt"] = datetime.now().strftime("%d/%m/%Y %H:%M")
     except Exception as e:
         print(f"Erro ao acessar site da Praticagem RJ: {e}", file=sys.stderr)
 
@@ -208,10 +233,15 @@ def run_sync():
             "maneuvers": live_maneuvers
         }, f, ensure_ascii=False, indent=2)
 
-    # 5. Salvar vessels_catalog.json
+    # 5. Salvar vessels_catalog.json (Navios Salvos do Terminal)
     sorted_catalog = sorted(list(catalog.values()), key=lambda x: x["name"])
     with open(catalog_path, "w", encoding="utf-8") as f:
         json.dump(sorted_catalog, f, ensure_ascii=False, indent=2)
+    try:
+        with open(root_catalog_path, "w", encoding="utf-8") as f:
+            json.dump(sorted_catalog, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
     print(json.dumps({
         "status": "success",
