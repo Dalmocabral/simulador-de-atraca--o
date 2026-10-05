@@ -40,48 +40,147 @@ export interface MooringLine {
   bollardId: string | null;
 }
 
-export type VesselType = "container" | "general-cargo" | "tanker" | "offshore";
+export type VesselType =
+  | "container"
+  | "chemical-tanker"
+  | "product-tanker"
+  | "tanker"
+  | "general-cargo"
+  | "offshore"
+  | "diving-support"
+  | "research-survey";
 
 export const VESSEL_TYPE_LABELS: Record<VesselType, string> = {
-  "container": "Porta-Contêineres (Container Ship)",
-  "general-cargo": "Carga Geral / Graneleiro (General Cargo Ship)",
-  "tanker": "Petroleiro / Químico (Tanker)",
-  "offshore": "Apoio Offshore (PSV / AHTS / OSRV)",
+  "container": "Porta-Contêineres (Container Ship - Fully Cellular)",
+  "chemical-tanker": "Navio Tanque Químico (Chemical Tanker)",
+  "product-tanker": "Petroleiro de Produtos (Product Tanker)",
+  "tanker": "Petroleiro / Químico (Tanker Geral)",
+  "general-cargo": "Carga Geral / Graneleiro (General Cargo)",
+  "offshore": "Apoio Marítimo (Platform Supply Ship / PSV / AHTS)",
+  "diving-support": "Apoio a Mergulho / Subsea (Diving Support Vessel - DSV)",
+  "research-survey": "Pesquisa / Hidrográfico (Research Survey Vessel)",
 };
 
-export function normalizeVesselType(raw?: string | null): VesselType {
-  if (!raw) return "container";
-  const upper = raw.toUpperCase().trim();
+export const KNOWN_VESSEL_TYPES: Record<string, VesselType> = {
+  "OCEAN MERMAID": "research-survey",
+  "CMA CGM IRON": "container",
+  "CMA CGM PUCCINI": "container",
+  "COSCO SHIPPING ARGENTINA": "container",
+  "COSCO SHIPPING BRAZIL": "container",
+  "COSCO SHIPPING CHILE": "container",
+  "EVER FAME": "container",
+  "EVER FAR": "container",
+  "EVER FASHION": "container",
+  "EVER LEADER": "container",
+  "KOTA PAHLAWAN": "container",
+  "LOG-IN PANTANAL": "container",
+  "LONCOMILLA": "container",
+  "MALIAKOS": "container",
+  "NC BRAVO": "container",
+  "NC BREDA": "container",
+  "TOKYO EXPRESS": "container",
+  "ZIM BALTIMORE": "container",
+};
+
+export function normalizeVesselType(raw?: string | null, vesselName?: string | null): VesselType {
+  const upper = (raw ?? "").toUpperCase().trim();
+  const upperName = (vesselName ?? "").toUpperCase().trim();
+
+  // 0. Reconhecimento direto pelo nome do navio no catálogo ou padrões de nomenclatura
+  if (upperName && KNOWN_VESSEL_TYPES[upperName]) {
+    return KNOWN_VESSEL_TYPES[upperName];
+  }
+  if (
+    upperName.includes("OCEAN MERMAID") ||
+    upperName.includes("SURVEY") ||
+    upperName.includes("RESEARCH") ||
+    upperName.includes("HIDROGRAF") ||
+    upperName.includes("OCEANOGRAF")
+  ) {
+    return "research-survey";
+  }
+
+  // 1. Pesquisa / Survey (específico)
+  if (
+    upper.includes("RESEARCH") ||
+    upper.includes("SURVEY") ||
+    upper.includes("HIDROGRAF") ||
+    upper.includes("PESQUISA") ||
+    upper.includes("OCEANOGRAF")
+  ) {
+    return "research-survey";
+  }
+
+  // 2. Chemical Tanker (específico)
+  if (
+    upper.includes("CHEMICAL") ||
+    upper.includes("QUÍMICO") ||
+    upper.includes("QUIMICO") ||
+    upperName.includes("CHEM") ||
+    upperName.includes("STOLT") ||
+    upperName.includes("ODFJELL")
+  ) {
+    return "chemical-tanker";
+  }
+
+  // 3. Product Tanker (específico)
+  if (
+    upper.includes("PRODUCT") ||
+    upper.includes("PRODUTO") ||
+    upper.includes("CLEAN")
+  ) {
+    return "product-tanker";
+  }
+
+  // 4. Tanker geral (petroleiro, óleo, gás)
+  if (
+    upper === "tanker" ||
+    upper.includes("TANKER") ||
+    upper.includes("OIL") ||
+    upper.includes("PETROLEIRO") ||
+    upper.includes("GAS") ||
+    upper.includes("LPG") ||
+    upper.includes("LNG") ||
+    upper.includes("BITUMEN") ||
+    upper.includes("ASPHALT") ||
+    upperName.includes("TANKER") ||
+    upperName.includes("PETRO")
+  ) {
+    return "tanker";
+  }
+
+  // 5. Apoio a Mergulho / DSV / Subsea
+  if (
+    upper.includes("DIVING") ||
+    upper.includes("MERGULHO") ||
+    upper.includes("DSV")
+  ) {
+    return "diving-support";
+  }
+
+  // 6. Apoio Offshore / PSV / Supply
   if (
     upper === "offshore" ||
     upper.includes("OFFSHORE") ||
+    upper.includes("PLATFORM SUPPLY") ||
     upper.includes("PSV") ||
     upper.includes("AHTS") ||
     upper.includes("SUPPLY") ||
     upper.includes("TUG") ||
     upper.includes("REBOCADOR") ||
     upper.includes("OSRV") ||
-    upper.includes("DSV") ||
-    upper.includes("PLSV")
+    upper.includes("PLSV") ||
+    upperName.includes("SUPPLY") ||
+    upperName.includes("AHTS") ||
+    upperName.includes("SKANDI") ||
+    upperName.includes("SIEM") ||
+    upperName.includes("NORMAND") ||
+    upperName.includes("BOURBON")
   ) {
     return "offshore";
   }
-  if (
-    upper === "tanker" ||
-    upper.includes("TANKER") ||
-    upper.includes("CHEMICAL") ||
-    upper.includes("OIL") ||
-    upper.includes("PETROLEIRO") ||
-    upper.includes("QUÍMICO") ||
-    upper.includes("QUIMICO") ||
-    upper.includes("GAS") ||
-    upper.includes("LPG") ||
-    upper.includes("LNG") ||
-    upper.includes("BITUMEN") ||
-    upper.includes("ASPHALT")
-  ) {
-    return "tanker";
-  }
+
+  // 7. Carga Geral / Graneleiro
   if (
     upper === "general-cargo" ||
     upper.includes("GENERAL CARGO") ||
@@ -94,6 +193,11 @@ export function normalizeVesselType(raw?: string | null): VesselType {
   ) {
     return "general-cargo";
   }
+
+  if (upper === "container" || upper.includes("CONTAINER")) {
+    return "container";
+  }
+
   return "container";
 }
 
@@ -425,7 +529,10 @@ export function normalizeScenario(value: unknown): Scenario | null {
       ? raw.color as VesselColor
       : (["blue", "teal", "orange", "violet"] as VesselColor[])[index % 4];
     const gangway = typeof raw.gangwayOffset === "number" && Number.isFinite(raw.gangwayOffset) ? raw.gangwayOffset : loa / 2;
-    const vesselType = normalizeVesselType(typeof raw.vesselType === "string" ? raw.vesselType : typeof raw.type === "string" ? raw.type : undefined);
+    const vesselType = normalizeVesselType(
+      typeof raw.vesselType === "string" ? raw.vesselType : typeof raw.type === "string" ? raw.type : undefined,
+      raw.name,
+    );
     vessels.push({
       id: typeof raw.id === "string" && raw.id ? raw.id : makeId("navio"),
       name: raw.name,

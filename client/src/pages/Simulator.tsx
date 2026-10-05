@@ -696,7 +696,8 @@ export default function Simulator() {
               {scenario.vessels.map((vessel) => {
                 const selected = selectedVesselId === vessel.id;
                 const vesselIssues = issues.filter((issue) => issue.vesselId === vessel.id);
-                const typeLabel = vessel.vesselType === "general-cargo" ? "Carga Geral" : vessel.vesselType === "tanker" ? "Petroleiro" : "Contêiner";
+                const resolvedType = normalizeVesselType(vessel.vesselType, vessel.name);
+                const typeLabel = VESSEL_TYPE_LABELS[resolvedType] || "Contêiner";
                 return (
                   <button key={vessel.id} type="button" className={`vessel-list-item ${selected ? "vessel-list-item-selected" : ""}`} onClick={() => setSelectedVesselId(vessel.id)}>
                     <span className="vessel-color-chip" style={{ background: VESSEL_COLORS[vessel.color].fill }} />
@@ -743,14 +744,34 @@ export default function Simulator() {
                 </div>
                 <div className="position-context"><Anchor size={13} /> Medida desde o início do cais · {vesselSectionName(selectedVessel, scenario.segments)}</div>
 
-                <div className="berthing-side-field">
-                  <label className="field-label" htmlFor="vessel-berthing-side">Lado de atracação</label>
-                  <select id="vessel-berthing-side" className="side-select" value={selectedVessel.berthingSide} onChange={(event) => patchVessel(selectedVessel.id, { berthingSide: event.target.value as BerthingSide })}>
-                    <option value="bombordo">Bombordo</option>
-                    <option value="boreste">Boreste</option>
-                  </select>
-                  <p className="form-hint">O traço colorido identifica o bordo voltado ao cais; a direção longitudinal de proa e popa permanece igual.</p>
+                <div className="field-row">
+                  <div className="berthing-side-field">
+                    <label className="field-label" htmlFor="vessel-berthing-side">Lado de atracação</label>
+                    <select id="vessel-berthing-side" className="side-select" value={selectedVessel.berthingSide} onChange={(event) => patchVessel(selectedVessel.id, { berthingSide: event.target.value as BerthingSide })}>
+                      <option value="bombordo">Bombordo</option>
+                      <option value="boreste">Boreste</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="vessel-type-select">Tipo de embarcação</label>
+                    <select
+                      id="vessel-type-select"
+                      className="side-select"
+                      value={normalizeVesselType(selectedVessel.vesselType, selectedVessel.name)}
+                      onChange={(event) => patchVessel(selectedVessel.id, { vesselType: event.target.value as VesselType })}
+                    >
+                      <option value="container">Porta-Contêineres</option>
+                      <option value="chemical-tanker">Navio Tanque Químico</option>
+                      <option value="product-tanker">Petroleiro de Produtos</option>
+                      <option value="tanker">Petroleiro / Químico (Geral)</option>
+                      <option value="general-cargo">Carga Geral / Graneleiro</option>
+                      <option value="offshore">Apoio Offshore (PSV / AHTS / Supply)</option>
+                      <option value="diving-support">Apoio a Mergulho (Diving Support Vessel - DSV)</option>
+                      <option value="research-survey">Pesquisa / Hidrográfico</option>
+                    </select>
+                  </div>
                 </div>
+                <p className="form-hint">O tipo define a modelagem 3D, convés de carga, manifold e superestrutura.</p>
 
                 <div className="field-row gangway-field-row">
                   <div>

@@ -17,6 +17,7 @@ import {
   DEFAULT_PORTAINERS,
   getPortainerOperationalLimits,
   clampPortainerPosition,
+  normalizeVesselType,
 } from "@/lib/berth-model";
 
 import {
@@ -586,6 +587,159 @@ function renderTankerDeck(
       {/* Botes salva-vidas totalmente fechados */}
       <rect x={houseX + 2} y={y + 1} width={Math.max(6, houseW * 0.32)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
       <rect x={houseX + 2} y={y + vesselHeight - 3.2} width={Math.max(6, houseW * 0.32)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
+    </g>
+  );
+}
+
+/** Renderiza o convés de uma Embarcação de Pesquisa / Hidrográfica (Research Survey Vessel - ex: Ocean Mermaid) com convés oceanográfico de popa, pórtico A-Frame e guinchos */
+function renderResearchSurveyDeck(
+  x: number,
+  y: number,
+  vesselWidth: number,
+  vesselHeight: number,
+  bowInset: number,
+  color: { fill: string; stroke: string }
+) {
+  // Superestrutura de meia-proa
+  const houseW = Math.max(16, Math.min(50, vesselWidth * 0.28));
+  const houseH = Math.max(12, vesselHeight * 0.78);
+  const houseX = x + vesselWidth * 0.42;
+  const houseY = y + (vesselHeight - houseH) / 2;
+
+  // Convés oceanográfico de popa
+  const surveyDeckX = x + 6;
+  const surveyDeckW = Math.max(10, houseX - surveyDeckX - 2);
+
+  return (
+    <g>
+      {/* Convés de trabalho oceanográfico na popa (antiderrapante cinza escuro) */}
+      <rect
+        x={surveyDeckX}
+        y={y + 2.5}
+        width={surveyDeckW}
+        height={vesselHeight - 5}
+        fill="#334155"
+        stroke="#1e293b"
+        strokeWidth="0.8"
+        rx="1"
+      />
+      {/* Laboratórios em módulos de contêineres científicos (Lab Vans) */}
+      <rect x={surveyDeckX + 4} y={y + 4} width={Math.max(6, surveyDeckW * 0.35)} height={vesselHeight * 0.32} fill="#e2e8f0" stroke="#475569" strokeWidth="0.6" rx="0.5" />
+      <rect x={surveyDeckX + 4} y={y + vesselHeight - vesselHeight * 0.32 - 4} width={Math.max(6, surveyDeckW * 0.35)} height={vesselHeight * 0.32} fill="#0284c7" stroke="#0369a1" strokeWidth="0.6" rx="0.5" />
+
+      {/* Guinchos de cabos oceanográficos (CTD winches) */}
+      <circle cx={surveyDeckX + surveyDeckW * 0.65} cy={y + vesselHeight * 0.35} r="2.8" fill="#1e293b" stroke="#64748b" strokeWidth="0.6" />
+      <circle cx={surveyDeckX + surveyDeckW * 0.65} cy={y + vesselHeight * 0.65} r="2.8" fill="#1e293b" stroke="#64748b" strokeWidth="0.6" />
+
+      {/* Pórtico A-Frame de Popa em Laranja Internacional */}
+      <rect x={x + 3} y={y + 2} width="4" height={vesselHeight - 4} fill="#ea580c" stroke="#9a3412" strokeWidth="0.9" rx="0.8" />
+      <line x1={x + 3} y1={y + vesselHeight / 2} x2={x + 10} y2={y + vesselHeight / 2} stroke="#ea580c" strokeWidth="1.6" />
+
+      {/* Superestrutura científica de meia-proa */}
+      <rect
+        x={houseX}
+        y={houseY}
+        width={houseW}
+        height={houseH}
+        rx="2"
+        fill="#1e40af"
+        stroke="#1e3a8a"
+        strokeWidth="1.2"
+      />
+      {/* Passadiço com asas */}
+      <line
+        x1={houseX + houseW * 0.68}
+        y1={y + 1.5}
+        x2={houseX + houseW * 0.68}
+        y2={y + vesselHeight - 1.5}
+        stroke="#ffffff"
+        strokeWidth="1.6"
+      />
+      {/* Cúpulas de radar e satélite brancas */}
+      <circle cx={houseX + houseW * 0.35} cy={y + vesselHeight * 0.38} r="2.2" fill="#ffffff" stroke="#94a3b8" strokeWidth="0.5" />
+      <circle cx={houseX + houseW * 0.35} cy={y + vesselHeight * 0.62} r="2.2" fill="#ffffff" stroke="#94a3b8" strokeWidth="0.5" />
+
+      {/* Proa com quebra-mar em V */}
+      <path
+        d={`M ${x + vesselWidth - bowInset} ${y + 3} L ${x + vesselWidth - 4} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset} ${y + vesselHeight - 3} Z`}
+        fill="#cbd5e1"
+        stroke="#64748b"
+        strokeWidth="0.8"
+      />
+    </g>
+  );
+}
+
+/** Renderiza o convés de uma Embarcação de Apoio Offshore (PSV / AHTS / Supply) com convés aberto de madeira na popa e crash rails */
+function renderOffshoreDeck(
+  x: number,
+  y: number,
+  vesselWidth: number,
+  vesselHeight: number,
+  bowInset: number,
+  color: { fill: string; stroke: string }
+) {
+  // Superestrutura na PROA
+  const houseW = Math.max(16, Math.min(48, vesselWidth * 0.28));
+  const houseH = Math.max(12, vesselHeight * 0.82);
+  const houseX = x + vesselWidth - bowInset - houseW;
+  const houseY = y + (vesselHeight - houseH) / 2;
+
+  // Enorme convés de carga aberto na ré em pranchamento de madeira
+  const aftDeckX = x + 6;
+  const aftDeckW = Math.max(12, houseX - aftDeckX);
+
+  return (
+    <g>
+      {/* Convés de madeira marítima na popa */}
+      <rect
+        x={aftDeckX}
+        y={y + 2.5}
+        width={aftDeckW}
+        height={vesselHeight - 5}
+        fill="#854d0e"
+        stroke="#713f12"
+        strokeWidth="0.8"
+        rx="1"
+      />
+      {/* Trilhos de peação de carga em aço */}
+      <line x1={aftDeckX} y1={y + vesselHeight * 0.35} x2={aftDeckX + aftDeckW} y2={y + vesselHeight * 0.35} stroke="#a16207" strokeWidth="0.7" strokeDasharray="4 2" />
+      <line x1={aftDeckX} y1={y + vesselHeight * 0.65} x2={aftDeckX + aftDeckW} y2={y + vesselHeight * 0.65} stroke="#a16207" strokeWidth="0.7" strokeDasharray="4 2" />
+
+      {/* Amuradas laterais com topo amarelo (Crash Rails) */}
+      <rect x={aftDeckX} y={y + 1} width={aftDeckW} height="1.8" fill="#eab308" stroke="#ca8a04" strokeWidth="0.4" />
+      <rect x={aftDeckX} y={y + vesselHeight - 2.8} width={aftDeckW} height="1.8" fill="#eab308" stroke="#ca8a04" strokeWidth="0.4" />
+
+      {/* Rolo de popa no espelho */}
+      <rect x={x + 2} y={y + vesselHeight * 0.25} width="3" height={vesselHeight * 0.5} rx="1" fill="#1e293b" stroke="#0f172a" strokeWidth="0.6" />
+
+      {/* Guindaste articulado subsea */}
+      <circle cx={houseX - 5} cy={y + vesselHeight * 0.3} r="3" fill="#1e3a8a" stroke="#0f172a" strokeWidth="0.7" />
+      <line x1={houseX - 5} y1={y + vesselHeight * 0.3} x2={houseX - 18} y2={y + vesselHeight * 0.35} stroke="#eab308" strokeWidth="1.6" strokeLinecap="round" />
+
+      {/* Superestrutura na PROA */}
+      <rect
+        x={houseX}
+        y={houseY}
+        width={houseW}
+        height={houseH}
+        rx="2"
+        fill={color.fill}
+        stroke={color.stroke}
+        strokeWidth="1.2"
+      />
+      {/* Asas do passadiço */}
+      <line
+        x1={houseX + houseW * 0.32}
+        y1={y + 1.5}
+        x2={houseX + houseW * 0.32}
+        y2={y + vesselHeight - 1.5}
+        stroke={color.stroke}
+        strokeWidth="1.6"
+      />
+      {/* Botes fechados embutidos */}
+      <rect x={houseX + 4} y={y + 1} width={Math.max(5, houseW * 0.26)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
+      <rect x={houseX + 4} y={y + vesselHeight - 3.2} width={Math.max(5, houseW * 0.26)} height="2.2" rx="1" fill="#ea580c" stroke="#9a3412" strokeWidth="0.5" />
     </g>
   );
 }
@@ -1184,7 +1338,7 @@ export default function BerthBlueprint({
           const messages = issueByVessel.get(vessel.id) ?? [];
           const isIssue = messages.length > 0;
           const isSelected = selectedVesselId === vessel.id;
-          const vesselType = vessel.vesselType ?? "container";
+          const vesselType = normalizeVesselType(vessel.vesselType, vessel.name);
 
           return (
             <g
@@ -1245,9 +1399,13 @@ export default function BerthBlueprint({
                 <path d={`M ${x + 6} ${y} Q ${x} ${y + vesselHeight / 2} ${x + 6} ${y + vesselHeight} L ${x + vesselWidth - bowInset} ${y + vesselHeight} L ${x + vesselWidth} ${y + vesselHeight / 2} L ${x + vesselWidth - bowInset} ${y} Z`} fill="#f7fafb" stroke={isIssue ? "#bd4540" : color.stroke} strokeWidth={isIssue ? 3 : 2} strokeDasharray={isIssue ? "7 4" : undefined} />
                 
                 {/* Visualização detalhada do convés conforme tipo de navio */}
-                {vesselType === "general-cargo"
+                {vesselType === "research-survey"
+                  ? renderResearchSurveyDeck(x, y, vesselWidth, vesselHeight, bowInset, color)
+                  : (vesselType === "offshore" || vesselType === "diving-support")
+                  ? renderOffshoreDeck(x, y, vesselWidth, vesselHeight, bowInset, color)
+                  : vesselType === "general-cargo"
                   ? renderGeneralCargoDeck(x, y, vesselWidth, vesselHeight, bowInset, color)
-                  : vesselType === "tanker"
+                  : (vesselType === "tanker" || vesselType === "chemical-tanker" || vesselType === "product-tanker")
                   ? renderTankerDeck(x, y, vesselWidth, vesselHeight, bowInset, color)
                   : renderContainerDeck(x, y, vesselWidth, vesselHeight, bowInset, color, index)
                 }

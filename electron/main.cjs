@@ -269,6 +269,10 @@ app.whenReady().then(async () => {
   const userDataDir = app.getPath("userData");
   const port = await startInternalServer(rootDir);
 
+  ipcMain.handle("sync-praticagem", async () => {
+    return await syncPraticagem(userDataDir, rootDir, () => {});
+  });
+
   if (splashWindow && !splashWindow.isDestroyed()) {
     splashWindow.webContents.send("splash-update", {
       message: "Serviço interno pronto. Conectando à Praticagem RJ...",

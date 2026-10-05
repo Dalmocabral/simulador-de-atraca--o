@@ -1,0 +1,1207 @@
+diff --git a/README.md b/README.md
+index 7d5ad3e..972f879 100644
+--- a/README.md
++++ b/README.md
+@@ -17,6 +17,7 @@ A ferramenta permite aos operadores e práticos simular o posicionamento métric
+ - [Visão Geral](#-visão-geral)
+ - [Funcionalidades Principais](#-funcionalidades-principais)
+ - [Tecnologias Utilizadas](#-tecnologias-utilizadas)
++- [Visualização 3D](#visualização-3d-esquemática)
+ - [Instalação e Execução](#-instalação-e-execução)
+ - [Estrutura do Projeto](#-estrutura-do-projeto)
+ - [Guia de Manutenção e Configuração](#-guia-de-manutenção-e-configuração)
+@@ -73,6 +74,17 @@ O simulador transforma cálculos complexos em um **Blueprint visual 2D em escala
+ - Banco de navios com dimensões reais (LOA, Boca, Calado, Tipo de Embarcação).
+ - Persistência contínua no navegador (`localStorage`) e capacidade de exportação/importação de cenários completos em JSON.
+ 
++### 7. Visualização 3D Esquemática
++- O botão **`Abrir vista 3D`** abre uma representação tridimensional do cenário atual, sem alterar os dados ou substituir o blueprint 2D.
++- Usa um modelo procedural inspirado na foto de referência: casco longitudinal afilado, convés contornado, fileiras de contêineres com cantoneiras, ponte escalonada com janelas e identificação lateral; mostra também cabos curvos, cais, cabeços, escadas e portêineres habilitados.
++- Os portêineres mostram pernas de terra e de mar, pórtico com contraventamentos, bogies com oito rodas por canto, casa de máquinas/contrapeso, carretel de cabo, torre e tirantes, lança treliçada, trolley com cabine, cabos de içamento e spreader. As vigas repetidas usam instâncias para manter a cena leve.
++- Permite orbitar, aproximar/afastar e deslocar a câmera; **Restaurar enquadramento** retorna à perspectiva inicial.
++- A cena é carregada apenas ao abrir a vista, limita a resolução do canvas e não mantém animação/renderização contínua quando a câmera está parada.
++- Usa Three.js, distribuído sob licença MIT; não exige API paga nem serviço de geração em nuvem.
++- Requer suporte a WebGL 2 no navegador e um driver gráfico funcional. Se não estiver disponível, o diálogo informa a limitação e a vista 2D continua utilizável.
++- **Limite importante:** é um modelo procedural esquemático inspirado na referência, não uma réplica exata de um navio específico. A altura e o perfil são ilustrativos, pois o cadastro não contém desenho de arranjo geral ou altura total; a cena não representa física, calado/variação de maré, tensão/comprimento de cabos ou validação de segurança. Não deve ser usada como autorização operacional.
++- Referências estruturais: [Liebherr — Ship-to-shore container cranes](https://www.liebherr.com/en-us/maritime-cranes/products/port-equipment/ship-to-shore-container-cranes-4433170) e [Port Economics — Portainers or STS Container Cranes](https://porteconomicsmanagement.org/pemp/contents/part6/container-terminal-design-equipment/portainers-ship-to-shore-container-cranes/).
++
+ ---
+ 
+ ## 🛠️ Tecnologias Utilizadas
+@@ -82,6 +94,7 @@ O simulador transforma cálculos complexos em um **Blueprint visual 2D em escala
+ | **Linguagem** | TypeScript 5.6 | Tipagem estática rigorosa para física, coordenadas e modelos portuários |
+ | **Interface** | React 19 | Arquitetura reativa de componentes e controle de estado |
+ | **Renderizador** | SVG (Scalable Vector Graphics) | Precisão métrica, zoom contínuo e renderização nítida sem perda de qualidade |
++| **Vista 3D opcional** | Three.js / WebGL 2 | Modelo esquemático sob demanda com câmera orbital; licença MIT |
+ | **Estilização** | CSS3 & TailwindCSS | Interface moderna, responsiva, contrastada e com estética náutica profissional |
+ | **Ícones** | Lucide React | Ícones operacionais limpos e consistentes |
+ | **Build & Dev** | Vite 7.1 | Inicialização instantânea e empacotamento ultrarrápido |
+diff --git a/client/src/caislab.css b/client/src/caislab.css
+index 19608e7..6484252 100644
+--- a/client/src/caislab.css
++++ b/client/src/caislab.css
+@@ -234,3 +234,52 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid
+   .mooring-remove { grid-column: 2; grid-row: 1 / span 2; }
+   .mooring-offset-row { grid-template-columns: minmax(0,1fr) 104px; }
+ }
++
++
++/* Vista tridimensional sob demanda — canvas estático, sem loop contínuo de renderização. */
++.blueprint-controls { flex-wrap: wrap; justify-content: flex-end; }
++.berth-3d-trigger { min-height: 36px; padding-inline: 14px; color: #fff; background: #167d8b; border-color: #167d8b; box-shadow: 0 2px 5px rgba(22,125,139,.2); }
++.berth-3d-trigger:hover { color: #fff; background: #116b78; border-color: #116b78; }
++.berth-3d-dialog {
++  width: min(1180px, 96vw) !important;
++  max-width: none !important;
++  height: min(820px, 92vh);
++  max-height: 92vh;
++  padding: 0 !important;
++  display: flex;
++  flex-direction: column;
++  overflow: hidden;
++  border-color: #d8e3e6;
++  background: #fbfdfd;
++}
++.berth-3d-dialog-header { flex: 0 0 auto; padding: 20px 24px 8px; }
++.berth-3d-dialog-header h2 { margin: 4px 0 2px; color: #183848; font-size: 18px; font-weight: 720; }
++.berth-3d-dialog-header p { max-width: 760px; margin: 4px 0 0; color: #72858c; font-size: 11px; }
++.berth-3d-viewer { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 18px 16px; }
++.berth-3d-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-height: 30px; color: #5c727a; font-size: 10px; }
++.berth-3d-summary strong { color: #294652; font-weight: 760; }
++.berth-3d-reset-view { min-height: 28px; padding: 0 9px; color: #315663; background: #fff; border: 1px solid #d8e1e4; border-radius: 5px; font-size: 9px; font-weight: 710; cursor: pointer; }
++.berth-3d-reset-view:hover { color: #116b78; background: #f3fafa; border-color: #b6d4d9; }
++.berth-3d-hint { margin-left: auto; color: #7e8e93; font-size: 9px; }
++.berth-3d-canvas-wrap { position: relative; min-height: 280px; flex: 1; overflow: hidden; border: 1px solid #d5e1e4; border-radius: 8px; background: #e6f0f3; }
++.berth-3d-canvas-wrap canvas { display: block; width: 100%; height: 100%; touch-action: none; }
++.berth-3d-state,.berth-3d-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; color: #49646e; background: rgba(239,246,247,.9); text-align: center; font-size: 12px; }
++.berth-3d-error { color: #87473d; background: rgba(255,247,243,.96); }
++.berth-3d-caveat { flex: 0 0 auto; margin: 0; padding: 0 3px; color: #7d8b90; font-size: 9px; line-height: 1.4; }
++@media (max-width: 760px) {
++  .berth-3d-dialog { width: 96vw !important; height: 91vh; max-height: 91vh; }
++  .berth-3d-dialog-header { padding: 18px 16px 7px; }
++  .berth-3d-viewer { padding: 0 12px 12px; }
++  .berth-3d-hint { width: 100%; margin-left: 0; }
++  .berth-3d-canvas-wrap { min-height: 240px; }
++}
++
++.berth-3d-vessel-key { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 13px; color: #526b75; font-size: 9px; }
++.berth-3d-vessel-key span { display: inline-flex; align-items: center; gap: 5px; }
++.berth-3d-vessel-key i { width: 8px; height: 8px; flex: 0 0 8px; border: 1px solid rgba(22,44,55,.28); border-radius: 2px; }
++.berth-3d-vessel-key .berth-3d-rope-key { width: 14px; height: 0; flex-basis: 14px; border: 0; border-top: 2px solid #d4ae00; border-radius: 0; }
++.berth-3d-vessel-key .berth-3d-bollard-key { background: #3d4529; border-radius: 50%; }
++.berth-3d-connections { max-height: 105px; overflow: auto; color: #567079; font-size: 9px; }
++.berth-3d-connections summary { width: fit-content; cursor: pointer; font-weight: 680; }
++.berth-3d-connections-list { display: flex; flex-wrap: wrap; gap: 5px 14px; padding: 7px 0 2px; }
++.berth-3d-connections-list span { padding: 3px 6px; background: #f2f6f6; border: 1px solid #e0e9ea; border-radius: 4px; }
+diff --git a/client/src/components/Berth3DViewer.tsx b/client/src/components/Berth3DViewer.tsx
+new file mode 100644
+index 0000000..b8779cc
+--- /dev/null
++++ b/client/src/components/Berth3DViewer.tsx
+@@ -0,0 +1,872 @@
++import { useEffect, useRef, useState } from "react";
++import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
++import type { Scenario, Vessel } from "@/lib/berth-model";
++import {
++  BOLLARD_TYPES,
++  DEFAULT_PORTAINERS,
++  berthwiseOffsetFromStern,
++  bollardDisplayPositions,
++  defaultMooringOffset,
++  MOORING_LINE_LABELS,
++  normalizeMooringOffset,
++  segmentOffsets,
++  totalQuayLength,
++  VESSEL_COLORS,
++} from "@/lib/berth-model";
++
++interface Berth3DViewerProps {
++  scenario: Scenario;
++}
++
++type ThreeModule = typeof import("three");
++type ThreeObject = import("three").Object3D;
++
++const CONTAINER_COLORS = ["#a93b38", "#213d67", "#d7cabb", "#9d472f", "#47604e", "#b08b35", "#68777c"];
++const HULL_STATIONS = [
++  [0, 0.72], [0.025, 0.83], [0.08, 0.94], [0.16, 0.98], [0.82, 0.98],
++  [0.9, 0.93], [0.95, 0.72], [0.98, 0.4], [1, 0.08],
++] as const;
++const BERTH_GAP = 4;
++const QUAY_EDGE_Z = 0;
++const QUAY_TOP_Y = 4;
++
++function addBox(
++  THREE: ThreeModule,
++  parent: ThreeObject,
++  size: [number, number, number],
++  position: [number, number, number],
++  material: import("three").Material,
++) {
++  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
++  mesh.position.set(...position);
++  mesh.castShadow = false;
++  mesh.receiveShadow = false;
++  parent.add(mesh);
++  return mesh;
++}
++
++function createHullGeometry(
++  THREE: ThreeModule,
++  direction: number,
++  loa: number,
++  beam: number,
++  draft: number,
++  freeboard: number,
++) {
++  const crossSection: [number, number][] = [
++    [-draft, 0], [-draft * 0.72, -0.48], [0, -0.86], [freeboard * 0.94, -1],
++    [freeboard, -0.94], [freeboard, 0.94], [freeboard * 0.94, 1], [0, 0.86], [-draft * 0.72, 0.48],
++  ];
++  const positions: number[] = [];
++  const indices: number[] = [];
++  for (const [fraction, fullness] of HULL_STATIONS) {
++    const x = direction * (fraction * loa - loa / 2);
++    const halfWidth = (beam * fullness) / 2;
++    for (const [y, sideFactor] of crossSection) positions.push(x, y, halfWidth * sideFactor);
++  }
++
++  const ringSize = crossSection.length;
++  for (let station = 0; station < HULL_STATIONS.length - 1; station += 1) {
++    for (let side = 0; side < ringSize; side += 1) {
++      const nextSide = (side + 1) % ringSize;
++      const a = station * ringSize + side;
++      const b = station * ringSize + nextSide;
++      const c = (station + 1) * ringSize + side;
++      const d = (station + 1) * ringSize + nextSide;
++      indices.push(a, b, c, b, d, c);
++    }
++  }
++
++  const sternCenter = positions.length / 3;
++  positions.push(direction * -loa / 2, (freeboard - draft) / 2, 0);
++  const bowCenter = positions.length / 3;
++  positions.push(direction * loa / 2, (freeboard - draft) / 2, 0);
++  const lastStation = (HULL_STATIONS.length - 1) * ringSize;
++  for (let side = 0; side < ringSize; side += 1) {
++    const nextSide = (side + 1) % ringSize;
++    indices.push(sternCenter, nextSide, side);
++    indices.push(bowCenter, lastStation + side, lastStation + nextSide);
++  }
++
++  const geometry = new THREE.BufferGeometry();
++  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
++  geometry.setIndex(indices);
++  geometry.computeVertexNormals();
++  return geometry;
++}
++
++function createDeckGeometry(THREE: ThreeModule, direction: number, loa: number, beam: number) {
++  const shape = new THREE.Shape();
++  shape.moveTo(direction * -loa / 2, 0);
++  for (const [fraction, fullness] of HULL_STATIONS.slice(1)) {
++    shape.lineTo(direction * (fraction * loa - loa / 2), (beam * fullness) / 2);
++  }
++  for (const [fraction, fullness] of [...HULL_STATIONS].reverse()) {
++    shape.lineTo(direction * (fraction * loa - loa / 2), -(beam * fullness) / 2);
++  }
++  shape.closePath();
++  const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.42, bevelEnabled: false, steps: 1 });
++  geometry.rotateX(-Math.PI / 2);
++  return geometry;
++}
++
++function addVesselNameplate(
++  THREE: ThreeModule,
++  group: ThreeObject,
++  vessel: Vessel,
++  loa: number,
++  beam: number,
++  freeboard: number,
++) {
++  const canvas = document.createElement("canvas");
++  canvas.width = 1024;
++  canvas.height = 160;
++  const context = canvas.getContext("2d");
++  if (!context) return;
++  const text = /cosco/i.test(vessel.name) ? "COSCO SHIPPING" : vessel.name.toUpperCase();
++  context.textAlign = "center";
++  context.textBaseline = "middle";
++  context.font = `800 ${text.length > 18 ? 68 : 92}px Arial, sans-serif`;
++  context.lineWidth = 8;
++  context.strokeStyle = "rgba(7, 31, 55, 0.7)";
++  context.strokeText(text, canvas.width / 2, canvas.height / 2, canvas.width - 36);
++  context.fillStyle = "#ffffff";
++  context.fillText(text, canvas.width / 2, canvas.height / 2, canvas.width - 36);
++
++  const texture = new THREE.CanvasTexture(canvas);
++  texture.colorSpace = THREE.SRGBColorSpace;
++  texture.generateMipmaps = false;
++  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthWrite: false });
++  const label = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(loa * 0.48, 190), 2.7), material);
++  label.position.set(0, freeboard * 0.43, beam * 0.5 + 0.08);
++  group.add(label);
++}
++
++function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Vessel, total: number) {
++  const direction = vessel.berthingSide === "boreste" ? 1 : -1;
++  const loa = Math.max(1, vessel.loa);
++  const beam = Math.max(1, vessel.beam);
++  const draft = Number.isFinite(vessel.draft) ? Math.max(1, Math.min(18, vessel.draft)) : 10;
++  const deckHeight = Math.max(6, Math.min(9, draft * 0.6));
++  const shipCenterX = vessel.position + loa / 2 - total / 2;
++  const shipCenterZ = BERTH_GAP + beam / 2;
++  const group = new THREE.Group();
++  group.position.set(shipCenterX, 0, shipCenterZ);
++  group.userData.vesselName = vessel.name;
++  scene.add(group);
++
++  const hullMaterial = new THREE.MeshStandardMaterial({
++    color: VESSEL_COLORS[vessel.color]?.stroke ?? "#285a78",
++    roughness: 0.58,
++    metalness: 0.12,
++    side: THREE.DoubleSide,
++  });
++  const hull = new THREE.Mesh(createHullGeometry(THREE, direction, loa, beam, draft, deckHeight), hullMaterial);
++  group.add(hull);
++
++  const deckMaterial = new THREE.MeshStandardMaterial({
++    color: "#314957",
++    roughness: 0.86,
++    side: THREE.DoubleSide,
++  });
++  const deck = new THREE.Mesh(createDeckGeometry(THREE, direction, loa, beam), deckMaterial);
++  deck.position.y = deckHeight - 0.37;
++  group.add(deck);
++
++  const houseLength = Math.max(18, Math.min(loa * 0.14, 48));
++  const houseMaterial = new THREE.MeshStandardMaterial({ color: "#e5eaeb", roughness: 0.66 });
++  const sternHouseX = direction * -loa * 0.35;
++  addBox(THREE, group, [houseLength, 5.6, beam * 0.52], [sternHouseX, deckHeight + 2.8, 0], houseMaterial);
++  const bridgeLength = houseLength * 0.72;
++  const bridgeX = sternHouseX - direction * houseLength * 0.1;
++  addBox(THREE, group, [bridgeLength, 3.0, beam * 0.42], [bridgeX, deckHeight + 6.75, 0], houseMaterial);
++  const windowMaterial = new THREE.MeshStandardMaterial({ color: "#19394b", roughness: 0.3, metalness: 0.28 });
++  addBox(THREE, group, [bridgeLength * 0.94, 0.62, beam * 0.435], [bridgeX, deckHeight + 6.35, 0], windowMaterial);
++  const funnelMaterial = new THREE.MeshStandardMaterial({ color: VESSEL_COLORS[vessel.color]?.stroke ?? "#285a78", roughness: 0.72 });
++  addBox(THREE, group, [houseLength * 0.24, 3.4, beam * 0.18], [sternHouseX + direction * houseLength * 0.28, deckHeight + 7.0, -beam * 0.13], funnelMaterial);
++  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 4.2, 8), houseMaterial);
++  mast.position.set(bridgeX - direction * bridgeLength * 0.24, deckHeight + 10.25, 0);
++  group.add(mast);
++
++  if ((vessel.vesselType ?? "container") === "container") {
++    const columns = Math.max(4, Math.min(20, Math.floor(loa / 16)));
++    const rows = beam >= 28 ? 3 : 2;
++    const tiers = beam >= 40 ? 4 : beam >= 32 ? 3 : 2;
++    const columnSpacing = (loa * 0.61) / columns;
++    const lengthPerContainer = Math.max(7.5, Math.min(15, columnSpacing * 0.92));
++    const widthPerContainer = Math.max(6, Math.min(10, beam * 0.72 / rows));
++    const containerLength = lengthPerContainer - 0.45;
++    const containerWidth = widthPerContainer - 0.45;
++    const containerGeometry = new THREE.BoxGeometry(containerLength, 2.55, containerWidth);
++    const containerMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.88 });
++    const instanceCount = columns * rows * tiers;
++    const containers = new THREE.InstancedMesh(containerGeometry, containerMaterial, instanceCount);
++    const cornerMaterial = new THREE.MeshStandardMaterial({ color: "#8a969b", roughness: 0.74, metalness: 0.16 });
++    const cornerPosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 2.48, 0.26), cornerMaterial, instanceCount * 4);
++    const pose = new THREE.Object3D();
++    let index = 0;
++    let cornerIndex = 0;
++    for (let column = 0; column < columns; column += 1) {
++      const fromStern = loa * 0.23 + (loa * 0.61 * (column + 0.5)) / columns;
++      for (let row = 0; row < rows; row += 1) {
++        for (let tier = 0; tier < tiers; tier += 1) {
++          const containerX = direction * (fromStern - loa / 2);
++          const containerY = deckHeight + 1.38 + tier * 2.68;
++          const containerZ = (row - (rows - 1) / 2) * widthPerContainer * 1.05;
++          pose.position.set(containerX, containerY, containerZ);
++          pose.updateMatrix();
++          containers.setMatrixAt(index, pose.matrix);
++          containers.setColorAt(index, new THREE.Color(CONTAINER_COLORS[(column + row * 2 + tier * 3) % CONTAINER_COLORS.length]));
++          for (const xSide of [-1, 1]) {
++            for (const zSide of [-1, 1]) {
++              pose.position.set(
++                containerX + xSide * (containerLength - 0.3) / 2,
++                containerY,
++                containerZ + zSide * (containerWidth - 0.3) / 2,
++              );
++              pose.updateMatrix();
++              cornerPosts.setMatrixAt(cornerIndex, pose.matrix);
++              cornerIndex += 1;
++            }
++          }
++          index += 1;
++        }
++      }
++    }
++    containers.instanceMatrix.needsUpdate = true;
++    if (containers.instanceColor) containers.instanceColor.needsUpdate = true;
++    cornerPosts.instanceMatrix.needsUpdate = true;
++    group.add(containers);
++    group.add(cornerPosts);
++  } else if (vessel.vesselType === "tanker") {
++    const tankMaterial = new THREE.MeshStandardMaterial({ color: "#d6dfe2", roughness: 0.9, metalness: 0.05 });
++    const count = Math.max(4, Math.min(7, Math.floor(loa / 48)));
++    const tankGeo = new THREE.CylinderGeometry(beam * 0.21, beam * 0.21, 2.8, 10);
++    for (let index = 0; index < count; index += 1) {
++      const distance = loa * (0.24 + (0.52 * (index + 0.5)) / count);
++      const tank = new THREE.Mesh(tankGeo, tankMaterial);
++      tank.position.set(direction * (distance - loa / 2), deckHeight + 1.7, 0);
++      group.add(tank);
++    }
++  } else {
++    const hatchMaterial = new THREE.MeshStandardMaterial({ color: "#596a7a", roughness: 0.9 });
++    const count = Math.max(3, Math.min(6, Math.floor(loa / 55)));
++    const hatchLength = loa * 0.55 / count;
++    for (let index = 0; index < count; index += 1) {
++      const distance = loa * (0.22 + (0.58 * (index + 0.5)) / count);
++      addBox(
++        THREE,
++        group,
++        [hatchLength, 2.3, beam * 0.68],
++        [direction * (distance - loa / 2), deckHeight + 1.5, 0],
++        hatchMaterial,
++      );
++    }
++  }
++
++  addVesselNameplate(THREE, group, vessel, loa, beam, deckHeight);
++  return { deckHeight };
++}
++
++type BeamSegment3D = {
++  start: [number, number, number];
++  end: [number, number, number];
++};
++
++function addBoxBeamBatch(
++  THREE: ThreeModule,
++  parent: ThreeObject,
++  segments: BeamSegment3D[],
++  section: [number, number],
++  material: import("three").Material,
++) {
++  if (!segments.length) return;
++  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(section[0], 1, section[1]), material, segments.length);
++  const pose = new THREE.Object3D();
++  const up = new THREE.Vector3(0, 1, 0);
++  segments.forEach(({ start: startPoint, end: endPoint }, index) => {
++    const start = new THREE.Vector3(...startPoint);
++    const end = new THREE.Vector3(...endPoint);
++    const direction = end.clone().sub(start);
++    const length = direction.length();
++    pose.position.copy(start).add(end).multiplyScalar(0.5);
++    pose.quaternion.setFromUnitVectors(up, direction.normalize());
++    pose.scale.set(1, length, 1);
++    pose.updateMatrix();
++    mesh.setMatrixAt(index, pose.matrix);
++  });
++  mesh.instanceMatrix.needsUpdate = true;
++  parent.add(mesh);
++}
++
++function addRoundBeamBatch(
++  THREE: ThreeModule,
++  parent: ThreeObject,
++  segments: BeamSegment3D[],
++  radius: number,
++  material: import("three").Material,
++) {
++  if (!segments.length) return;
++  const mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(radius, radius, 1, 6), material, segments.length);
++  const pose = new THREE.Object3D();
++  const up = new THREE.Vector3(0, 1, 0);
++  segments.forEach(({ start: startPoint, end: endPoint }, index) => {
++    const start = new THREE.Vector3(...startPoint);
++    const end = new THREE.Vector3(...endPoint);
++    const direction = end.clone().sub(start);
++    const length = direction.length();
++    pose.position.copy(start).add(end).multiplyScalar(0.5);
++    pose.quaternion.setFromUnitVectors(up, direction.normalize());
++    pose.scale.set(1, length, 1);
++    pose.updateMatrix();
++    mesh.setMatrixAt(index, pose.matrix);
++  });
++  mesh.instanceMatrix.needsUpdate = true;
++  parent.add(mesh);
++}
++
++function addPortainer(
++  THREE: ThreeModule,
++  scene: import("three").Scene,
++  portainer: NonNullable<Scenario["portainers"]>[number],
++  total: number,
++) {
++  if (!portainer.enabled) return;
++  const group = new THREE.Group();
++  group.position.x = portainer.position - total / 2;
++
++  const craneColor = new THREE.Color(portainer.color);
++  const braceColor = craneColor.clone().lerp(new THREE.Color("#eef2f3"), 0.42);
++  const frameMaterial = new THREE.MeshStandardMaterial({ color: craneColor, roughness: 0.64, metalness: 0.22 });
++  const braceMaterial = new THREE.MeshStandardMaterial({ color: braceColor, roughness: 0.7, metalness: 0.16 });
++  const darkMaterial = new THREE.MeshStandardMaterial({ color: "#39474d", roughness: 0.76, metalness: 0.22 });
++  const glassMaterial = new THREE.MeshStandardMaterial({ color: "#244859", roughness: 0.3, metalness: 0.2 });
++  const paleMaterial = new THREE.MeshStandardMaterial({ color: "#e7ecee", roughness: 0.65, metalness: 0.06 });
++  const spreaderMaterial = new THREE.MeshStandardMaterial({ color: "#e5b52a", roughness: 0.62, metalness: 0.16 });
++
++  const groundY = QUAY_TOP_Y + 1.35;
++  const topY = 28.5;
++  const landBaseZ = -21;
++  const landTopZ = -19.5;
++  const waterBaseZ = -1.2;
++  const waterTopZ = -4.0;
++  const watersideLegs: BeamSegment3D[] = [];
++  const landsideLegs: BeamSegment3D[] = [];
++  const legFootings: Array<[number, number, number]> = [];
++  const wheelPositions: Array<[number, number, number]> = [];
++
++  for (const xSide of [-1, 1]) {
++    for (const [isWaterside, baseZ, topZ] of [
++      [false, landBaseZ, landTopZ],
++      [true, waterBaseZ, waterTopZ],
++    ] as const) {
++      const baseX = xSide * 10;
++      const topX = xSide * 7.7;
++      const segment = {
++        start: [baseX, groundY, baseZ] as [number, number, number],
++        end: [topX, topY, topZ] as [number, number, number],
++      };
++      (isWaterside ? watersideLegs : landsideLegs).push(segment);
++      legFootings.push([baseX, groundY, baseZ]);
++      for (let wheel = 0; wheel < 4; wheel += 1) {
++        wheelPositions.push([baseX + (wheel - 1.5) * 1.35, QUAY_TOP_Y + 0.93, baseZ - 1.0]);
++        wheelPositions.push([baseX + (wheel - 1.5) * 1.35, QUAY_TOP_Y + 0.93, baseZ + 1.0]);
++      }
++    }
++  }
++
++  addBoxBeamBatch(THREE, group, landsideLegs, [1.45, 1.65], frameMaterial);
++  addBoxBeamBatch(THREE, group, watersideLegs, [1.9, 2.0], frameMaterial);
++  for (const [x, , z] of legFootings) {
++    addBox(THREE, group, [7.3, 0.95, 4.0], [x, groundY, z], darkMaterial);
++  }
++  const wheelMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.68, 0.68, 1.15, 12), darkMaterial, wheelPositions.length);
++  const wheelPose = new THREE.Object3D();
++  wheelPositions.forEach(([x, y, z], index) => {
++    wheelPose.position.set(x, y, z);
++    wheelPose.rotation.x = Math.PI / 2;
++    wheelPose.updateMatrix();
++    wheelMesh.setMatrixAt(index, wheelPose.matrix);
++  });
++  wheelMesh.instanceMatrix.needsUpdate = true;
++  group.add(wheelMesh);
++
++  const portalMembers: BeamSegment3D[] = [];
++  const portalBraces: BeamSegment3D[] = [];
++  for (const xSide of [-1, 1]) {
++    const x = xSide * 7.7;
++    portalMembers.push(
++      { start: [x, 8.5, landTopZ], end: [x, 8.5, waterTopZ] },
++      { start: [x, 18.5, landTopZ], end: [x, 18.5, waterTopZ] },
++    );
++    portalBraces.push(
++      { start: [xSide * 9.5, 6, landBaseZ], end: [x, 21, waterTopZ] },
++      { start: [xSide * 9.5, 6, waterBaseZ], end: [x, 21, landTopZ] },
++    );
++  }
++  const portalCrossbeams: BeamSegment3D[] = [
++    { start: [-8, topY, landTopZ], end: [8, topY, landTopZ] },
++    { start: [-8, topY, waterTopZ], end: [8, topY, waterTopZ] },
++    { start: [-7.7, 18.5, landTopZ], end: [7.7, 18.5, landTopZ] },
++    { start: [-7.7, 18.5, waterTopZ], end: [7.7, 18.5, waterTopZ] },
++  ];
++  addBoxBeamBatch(THREE, group, portalMembers, [0.9, 0.9], braceMaterial);
++  addBoxBeamBatch(THREE, group, portalBraces, [0.72, 0.72], braceMaterial);
++  addBoxBeamBatch(THREE, group, portalCrossbeams, [1.3, 1.3], frameMaterial);
++  addBox(THREE, group, [17.5, 2.0, 22.8], [0, topY, (landTopZ + waterTopZ) / 2], frameMaterial);
++
++  addBox(THREE, group, [10.5, 4.7, 8.5], [0, 31.5, -15.0], paleMaterial);
++  addBox(THREE, group, [8.0, 3.4, 4.2], [0, 31.1, -23.0], darkMaterial);
++  addBox(THREE, group, [5.8, 0.42, 8.6], [0, 32.2, -15.0], glassMaterial);
++  const cableReel = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2.2, 16), darkMaterial);
++  cableReel.rotation.z = Math.PI / 2;
++  cableReel.position.set(0, 12.0, -17.3);
++  group.add(cableReel);
++
++  const boomStartZ = -2.5;
++  const boomEndZ = 49;
++  const boomBottomY = 32.6;
++  const boomTopY = 37.0;
++  const boomHalfWidth = 4.6;
++  const boomChordMembers: BeamSegment3D[] = [];
++  const boomLattice: BeamSegment3D[] = [];
++  const boomCrossMembers: BeamSegment3D[] = [];
++  const panelCount = 13;
++  const panelLength = (boomEndZ - boomStartZ) / panelCount;
++  for (const xSide of [-1, 1]) {
++    const x = xSide * boomHalfWidth;
++    boomChordMembers.push(
++      { start: [x, boomBottomY, boomStartZ], end: [x, boomBottomY, boomEndZ] },
++      { start: [x, boomTopY, boomStartZ], end: [x, boomTopY, boomEndZ] },
++    );
++    for (let panel = 0; panel <= panelCount; panel += 1) {
++      const z = boomStartZ + panel * panelLength;
++      boomLattice.push({ start: [x, boomBottomY, z], end: [x, boomTopY, z] });
++      if (panel < panelCount) {
++        const nextZ = z + panelLength;
++        boomLattice.push(
++          { start: [x, boomBottomY, z], end: [x, boomTopY, nextZ] },
++          { start: [x, boomTopY, z], end: [x, boomBottomY, nextZ] },
++        );
++      }
++      boomCrossMembers.push(
++        { start: [-boomHalfWidth, boomBottomY, z], end: [boomHalfWidth, boomBottomY, z] },
++        { start: [-boomHalfWidth, boomTopY, z], end: [boomHalfWidth, boomTopY, z] },
++      );
++    }
++  }
++  addBoxBeamBatch(THREE, group, boomChordMembers, [0.75, 0.75], frameMaterial);
++  addBoxBeamBatch(THREE, group, boomLattice, [0.36, 0.36], braceMaterial);
++  addBoxBeamBatch(THREE, group, boomCrossMembers, [0.32, 0.32], frameMaterial);
++  const boomHinge = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 12, 12), darkMaterial);
++  boomHinge.rotation.z = Math.PI / 2;
++  boomHinge.position.set(0, (boomBottomY + boomTopY) / 2, boomStartZ);
++  group.add(boomHinge);
++
++  const towerApex: [number, number, number] = [0, 51, -9];
++  const towerMembers: BeamSegment3D[] = [
++    { start: [-6.2, topY, -9], end: towerApex },
++    { start: [6.2, topY, -9], end: towerApex },
++    { start: [0, 32, -9], end: towerApex },
++    { start: [-6.2, 39, -9], end: [6.2, 39, -9] },
++  ];
++  addBoxBeamBatch(THREE, group, towerMembers, [0.62, 0.62], frameMaterial);
++  const stayRods: BeamSegment3D[] = [];
++  for (const xSide of [-1, 1]) {
++    stayRods.push(
++      { start: towerApex, end: [xSide * boomHalfWidth, boomTopY, boomEndZ] },
++      { start: towerApex, end: [xSide * boomHalfWidth, boomTopY, -31] },
++    );
++  }
++  addRoundBeamBatch(THREE, group, stayRods, 0.16, darkMaterial);
++
++  const trolleyZ = 26;
++  const trolleyY = boomBottomY - 0.95;
++  addBox(THREE, group, [7.0, 1.5, 5.5], [0, trolleyY, trolleyZ], darkMaterial);
++  addBox(THREE, group, [2.2, 2.0, 2.0], [3.7, trolleyY - 0.5, trolleyZ], paleMaterial);
++  addBox(THREE, group, [1.72, 0.7, 0.08], [3.7, trolleyY - 0.42, trolleyZ + 1.04], glassMaterial);
++  addBox(THREE, group, [1.72, 0.7, 0.08], [3.7, trolleyY - 0.42, trolleyZ - 1.04], glassMaterial);
++  const trolleyWheels = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.44, 0.44, 0.8, 10), darkMaterial, 4);
++  const trolleyPose = new THREE.Object3D();
++  let trolleyWheelIndex = 0;
++  for (const x of [-3.45, 3.45]) {
++    for (const z of [trolleyZ - 1.9, trolleyZ + 1.9]) {
++      trolleyPose.position.set(x, boomBottomY + 0.24, z);
++      trolleyPose.rotation.z = Math.PI / 2;
++      trolleyPose.updateMatrix();
++      trolleyWheels.setMatrixAt(trolleyWheelIndex, trolleyPose.matrix);
++      trolleyWheelIndex += 1;
++    }
++  }
++  trolleyWheels.instanceMatrix.needsUpdate = true;
++  group.add(trolleyWheels);
++  const hoistCables: BeamSegment3D[] = [];
++  for (const xSide of [-1, 1]) {
++    for (const zSide of [-1, 1]) {
++      hoistCables.push({
++        start: [xSide * 4.7, trolleyY - 0.2, trolleyZ + zSide * 1.8],
++        end: [xSide * 4.7, 20.56, trolleyZ + zSide * 1.2],
++      });
++    }
++  }
++  addRoundBeamBatch(THREE, group, hoistCables, 0.13, darkMaterial);
++  addBox(THREE, group, [12.2, 0.52, 2.6], [0, 20.3, trolleyZ], spreaderMaterial);
++  for (const xSide of [-1, 1]) {
++    for (const zSide of [-1, 1]) {
++      addBox(THREE, group, [0.65, 0.72, 0.62], [xSide * 5.75, 20.2, trolleyZ + zSide * 1.12], darkMaterial);
++    }
++  }
++
++  scene.add(group);
++}
++
++function addBollardLabel(
++  THREE: ThreeModule,
++  scene: import("three").Scene,
++  id: string,
++  position: number,
++  total: number,
++  color: string,
++  estimated: boolean,
++) {
++  const canvas = document.createElement("canvas");
++  canvas.width = 96;
++  canvas.height = 40;
++  const context = canvas.getContext("2d");
++  if (!context) return;
++  context.fillStyle = color;
++  context.fillRect(2, 2, 92, 36);
++  context.strokeStyle = "rgba(15, 23, 42, 0.8)";
++  context.lineWidth = 3;
++  context.strokeRect(2, 2, 92, 36);
++  context.fillStyle = "#ffffff";
++  context.font = `800 ${id.length > 4 ? 17 : id.length === 4 ? 21 : 27}px Arial, sans-serif`;
++  context.textAlign = "center";
++  context.textBaseline = "middle";
++  context.fillText(id, 48, 21, 86);
++
++  const texture = new THREE.CanvasTexture(canvas);
++  texture.colorSpace = THREE.SRGBColorSpace;
++  texture.generateMipmaps = false;
++  const material = new THREE.SpriteMaterial({
++    map: texture,
++    transparent: true,
++    opacity: estimated ? 0.72 : 1,
++    depthWrite: false,
++  });
++  const label = new THREE.Sprite(material);
++  label.position.set(position - total / 2, QUAY_TOP_Y + 3.0, -0.7);
++  label.scale.set(Math.max(6, Math.min(12, id.length * 2.1)), 3, 1);
++  label.userData.bollardId = id;
++  scene.add(label);
++}
++
++function addMooringLines(THREE: ThreeModule, scene: import("three").Scene, scenario: Scenario, total: number) {
++  const bollards = new Map(bollardDisplayPositions(scenario.bollards, total).map((bollard) => [bollard.id, bollard]));
++  const cableMaterial = new THREE.MeshStandardMaterial({ color: "#f1cc19", roughness: 0.72, metalness: 0.02, emissive: "#4a3d00", emissiveIntensity: 0.14 });
++
++  for (const vessel of scenario.vessels) {
++    const beam = Math.max(1, vessel.beam);
++    const nearSideZ = BERTH_GAP + beam * 0.01 + 0.1;
++    const draft = Number.isFinite(vessel.draft) ? Math.max(1, Math.min(18, vessel.draft)) : 10;
++    const deckHeight = Math.max(6, Math.min(9, draft * 0.6));
++    for (const line of vessel.mooringLines) {
++      if (!line.bollardId) continue;
++      const bollard = bollards.get(line.bollardId);
++      if (!bollard) continue;
++      const offset = normalizeMooringOffset(line.type, vessel.loa, line.shipOffset ?? defaultMooringOffset(line.type, vessel.loa));
++      const shipStation = vessel.position + berthwiseOffsetFromStern(vessel.loa, vessel.berthingSide, offset);
++      const shipX = shipStation - total / 2;
++      const quayX = bollard.position - total / 2;
++      const start = new THREE.Vector3(shipX, deckHeight + 0.65, nearSideZ);
++      const end = new THREE.Vector3(quayX, QUAY_TOP_Y + 1.15, QUAY_EDGE_Z - 0.6);
++      const span = start.distanceTo(end);
++      const slack = Math.min(1.25, Math.max(0.35, span * 0.018));
++      const control = start.clone().lerp(end, 0.5);
++      control.y -= slack * 2;
++      const curve = new THREE.QuadraticBezierCurve3(start, control, end);
++      const rope = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.18, 5, false), cableMaterial);
++      rope.userData.lineType = line.type;
++      rope.userData.vesselId = vessel.id;
++      scene.add(rope);
++    }
++  }
++}
++
++function buildScene(THREE: ThreeModule, scene: import("three").Scene, scenario: Scenario) {
++  const total = Math.max(1, totalQuayLength(scenario.segments));
++  const segments = segmentOffsets(scenario.segments);
++  const segmentColors = ["#d9c8a9", "#d9cfbd", "#bccbd0", "#c7d7d7"];
++  const waterMaterial = new THREE.MeshStandardMaterial({ color: "#8fc4cd", roughness: 0.34, metalness: 0.04 });
++  const water = new THREE.Mesh(new THREE.PlaneGeometry(total + 180, 430), waterMaterial);
++  water.rotation.x = -Math.PI / 2;
++  water.position.set(0, 0, 185);
++  scene.add(water);
++
++  for (const [index, segment] of segments.entries()) {
++    const length = Math.max(0.5, segment.length);
++    const quayMaterial = new THREE.MeshStandardMaterial({ color: segmentColors[index % segmentColors.length], roughness: 0.92 });
++    const quay = new THREE.Mesh(new THREE.BoxGeometry(length, 8, 30), quayMaterial);
++    quay.position.set(segment.start + length / 2 - total / 2, 0, -15);
++    scene.add(quay);
++  }
++
++  const edgeMaterial = new THREE.MeshStandardMaterial({ color: "#546c74", roughness: 0.8 });
++  addBox(THREE, scene, [total, 0.5, 0.9], [0, 3.8, -0.35], edgeMaterial);
++
++  const railMaterial = new THREE.MeshStandardMaterial({ color: "#46545a", roughness: 0.54, metalness: 0.48 });
++  for (const z of [-22, -20, -2.2, -0.2]) {
++    addBox(THREE, scene, [total, 0.24, 0.42], [0, QUAY_TOP_Y + 0.12, z], railMaterial);
++  }
++
++  const bollardDisplays = bollardDisplayPositions(scenario.bollards, total);
++  if (bollardDisplays.length) {
++    const bollardGeo = new THREE.CylinderGeometry(0.55, 0.82, 1.55, 8);
++    const bollardMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.72, metalness: 0.22 });
++    const posts = new THREE.InstancedMesh(bollardGeo, bollardMat, bollardDisplays.length);
++    const pose = new THREE.Object3D();
++    bollardDisplays.forEach((display, index) => {
++      pose.position.set(display.position - total / 2, QUAY_TOP_Y + 0.7, -0.6);
++      pose.scale.setScalar(display.estimated ? 0.72 : 1);
++      pose.updateMatrix();
++      posts.setMatrixAt(index, pose.matrix);
++      const type = scenario.bollards.find((bollard) => bollard.id === display.id)?.type ?? display.type ?? "duplo";
++      const typeColor = BOLLARD_TYPES[type]?.color ?? "#3a7ebf";
++      posts.setColorAt(index, new THREE.Color(typeColor));
++      addBollardLabel(THREE, scene, display.id, display.position, total, typeColor, display.estimated);
++    });
++    posts.instanceMatrix.needsUpdate = true;
++    if (posts.instanceColor) posts.instanceColor.needsUpdate = true;
++    scene.add(posts);
++  }
++
++  const vesselRefs = scenario.vessels.map((vessel) => ({ vessel, ...addVessel(THREE, scene, vessel, total) }));
++  addMooringLines(THREE, scene, scenario, total);
++
++  if (scenario.showPortainers !== false) {
++    for (const portainer of scenario.portainers ?? DEFAULT_PORTAINERS) addPortainer(THREE, scene, portainer, total);
++  }
++
++  const gangwayMaterial = new THREE.MeshStandardMaterial({ color: "#7c72aa", roughness: 0.8 });
++  for (const { vessel, deckHeight } of vesselRefs) {
++    const offset = Math.max(0, Math.min(vessel.loa, vessel.gangwayOffset));
++    const gangwayStation = vessel.position + berthwiseOffsetFromStern(vessel.loa, vessel.berthingSide, offset);
++    const gangwayX = gangwayStation - total / 2;
++    const nearSideZ = BERTH_GAP + Math.max(1, vessel.beam) * 0.01 + 0.1;
++    const startZ = QUAY_EDGE_Z - 0.7;
++    const rampLength = nearSideZ - startZ;
++    const deckTop = deckHeight + 0.45;
++    const ramp = addBox(THREE, scene, [2.2, 0.55, rampLength], [gangwayX, (QUAY_TOP_Y + deckTop) / 2, (nearSideZ + startZ) / 2], gangwayMaterial);
++    ramp.rotation.x = -Math.atan2(deckTop - QUAY_TOP_Y, rampLength);
++  }
++
++  return { total, bollardCount: bollardDisplays.length };
++}
++
++function disposeScene(scene: import("three").Scene) {
++  const geometries = new Set<import("three").BufferGeometry>();
++  const materials = new Set<import("three").Material>();
++  const textures = new Set<import("three").Texture>();
++  scene.traverse((object) => {
++    const renderable = object as import("three").Mesh;
++    const sprite = object as import("three").Sprite;
++    if (!renderable.isMesh && !(object as import("three").InstancedMesh).isInstancedMesh && !(object as import("three").Line).isLine && !sprite.isSprite) return;
++    const resource = object as import("three").Mesh;
++    if (resource.geometry) geometries.add(resource.geometry);
++    const material = resource.material;
++    const addMaterial = (entry: import("three").Material) => {
++      materials.add(entry);
++      const texture = (entry as import("three").SpriteMaterial).map;
++      if (texture?.isTexture) textures.add(texture);
++    };
++    if (Array.isArray(material)) material.forEach(addMaterial);
++    else if (material) addMaterial(material);
++  });
++  geometries.forEach((geometry) => geometry.dispose());
++  materials.forEach((material) => material.dispose());
++  textures.forEach((texture) => texture.dispose());
++}
++
++export default function Berth3DViewer({ scenario }: Berth3DViewerProps) {
++  const hostRef = useRef<HTMLDivElement>(null);
++  const resetCameraRef = useRef<() => void>(() => undefined);
++  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
++  const [error, setError] = useState("");
++  const total = totalQuayLength(scenario.segments);
++  const assignedLineCount = scenario.vessels.reduce(
++    (count, vessel) => count + vessel.mooringLines.filter((line) => Boolean(line.bollardId)).length,
++    0,
++  );
++  const assignedLines = scenario.vessels.flatMap((vessel) =>
++    vessel.mooringLines.filter((line) => Boolean(line.bollardId)).map((line) => ({ vessel, line })),
++  );
++  const estimatedBollards = scenario.bollards.filter((bollard) => bollard.position === null).length;
++
++  useEffect(() => {
++    const host = hostRef.current;
++    if (!host) return;
++    let cancelled = false;
++    let threeModule: ThreeModule | null = null;
++    let renderer: import("three").WebGLRenderer | null = null;
++    let scene: import("three").Scene | null = null;
++    let controls: OrbitControls | null = null;
++    let resizeObserver: ResizeObserver | null = null;
++    let contextLostHandler: ((event: Event) => void) | null = null;
++
++    setStatus("loading");
++    setError("");
++
++    void Promise.all([import("three"), import("three/addons/controls/OrbitControls.js")])
++      .then(([THREE, orbitModule]) => {
++        if (cancelled || !host) return;
++        threeModule = THREE;
++        try {
++          scene = new THREE.Scene();
++          scene.background = new THREE.Color("#e6f0f3");
++          scene.add(new THREE.HemisphereLight("#ffffff", "#647680", 2.0));
++          const keyLight = new THREE.DirectionalLight("#ffffff", 2.2);
++          keyLight.position.set(-80, 150, 100);
++          scene.add(keyLight);
++
++          const width = Math.max(1, host.clientWidth);
++          const height = Math.max(1, host.clientHeight);
++          renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power", alpha: false });
++          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
++          renderer.setSize(width, height, false);
++          renderer.outputColorSpace = THREE.SRGBColorSpace;
++          renderer.domElement.setAttribute("aria-label", "Modelo 3D esquemático da atracação");
++          host.appendChild(renderer.domElement);
++
++          const model = buildScene(THREE, scene, scenario);
++          const camera = new THREE.PerspectiveCamera(43, width / height, 0.5, model.total * 7 + 400);
++          const verticalFov = THREE.MathUtils.degToRad(camera.fov);
++          const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
++          const distanceToFitQuay = model.total / (2 * Math.tan(horizontalFov / 2));
++          const distance = Math.max(model.total * 0.48, distanceToFitQuay * 1.06);
++          camera.position.set(0, distance * 0.78, distance * 0.82);
++          camera.lookAt(0, 6, 24);
++
++          controls = new orbitModule.OrbitControls(camera, renderer.domElement);
++          controls.target.set(0, 6, 24);
++          controls.enableDamping = false;
++          controls.enablePan = true;
++          controls.enableZoom = true;
++          controls.screenSpacePanning = true;
++          controls.minDistance = Math.max(70, model.total * 0.13);
++          controls.maxDistance = model.total * 8 + 200;
++          controls.update();
++
++          const render = () => {
++            if (!cancelled && renderer && scene) renderer.render(scene, camera);
++          };
++          const defaultCameraPosition = camera.position.clone();
++          const defaultCameraTarget = controls.target.clone();
++          resetCameraRef.current = () => {
++            camera.position.copy(defaultCameraPosition);
++            controls?.target.copy(defaultCameraTarget);
++            controls?.update();
++            render();
++          };
++          controls.addEventListener("change", render);
++          resizeObserver = new ResizeObserver(() => {
++            if (!renderer || !host) return;
++            const nextWidth = Math.max(1, host.clientWidth);
++            const nextHeight = Math.max(1, host.clientHeight);
++            camera.aspect = nextWidth / nextHeight;
++            camera.updateProjectionMatrix();
++            renderer.setSize(nextWidth, nextHeight, false);
++            render();
++          });
++          resizeObserver.observe(host);
++          contextLostHandler = (event: Event) => {
++            event.preventDefault();
++            if (!cancelled) {
++              setError("A aceleração 3D do navegador foi interrompida. Feche esta janela e continue usando a vista 2D.");
++              setStatus("error");
++            }
++          };
++          renderer.domElement.addEventListener("webglcontextlost", contextLostHandler, { once: true });
++          render();
++          if (!cancelled) setStatus("ready");
++        } catch (cause) {
++          if (cancelled) return;
++          if (scene) {
++            disposeScene(scene);
++            scene = null;
++          }
++          controls?.dispose();
++          controls = null;
++          renderer?.dispose();
++          renderer?.domElement.remove();
++          renderer = null;
++          setError(cause instanceof Error && /webgl|context|renderer/i.test(cause.message)
++            ? "Este navegador ou dispositivo não conseguiu iniciar WebGL 2. A visualização 2D continua disponível."
++            : "Não foi possível montar a cena 3D neste dispositivo. A visualização 2D continua disponível.");
++          setStatus("error");
++        }
++      })
++      .catch(() => {
++        if (!cancelled) {
++          setError("Não foi possível carregar o módulo 3D. A visualização 2D continua disponível.");
++          setStatus("error");
++        }
++      });
++
++    return () => {
++      cancelled = true;
++      resetCameraRef.current = () => undefined;
++      resizeObserver?.disconnect();
++      controls?.dispose();
++      if (renderer && contextLostHandler) renderer.domElement.removeEventListener("webglcontextlost", contextLostHandler);
++      if (scene && threeModule) disposeScene(scene);
++      renderer?.dispose();
++      renderer?.domElement.remove();
++    };
++  }, [scenario]);
++
++  return (
++    <div className="berth-3d-viewer">
++      <div className="berth-3d-summary" aria-label="Resumo do cenário 3D">
++        <span><strong>{scenario.vessels.length}</strong> navio(s)</span>
++        <span><strong>{scenario.bollards.length}</strong> cabeços</span>
++        <span><strong>{assignedLineCount}</strong> cabo(s) conectado(s)</span>
++        <button type="button" className="berth-3d-reset-view" onClick={() => resetCameraRef.current()} aria-label="Restaurar o enquadramento inicial da câmera">
++          Restaurar enquadramento
++        </button>
++        <span className="berth-3d-hint">Arraste para girar · roda do mouse para zoom · botão direito para mover</span>
++      </div>
++      <div className="berth-3d-vessel-key" aria-label="Navios e direção da proa">
++        {scenario.vessels.map((vessel) => (
++          <span key={vessel.id}>
++            <i style={{ background: VESSEL_COLORS[vessel.color]?.fill ?? "#3f779b" }} />
++            {vessel.name || "Navio sem nome"} · proa {vessel.berthingSide === "bombordo" ? "←" : "→"}
++          </span>
++        ))}
++        <span><i className="berth-3d-rope-key" /> Cabos amarelos</span>
++        <span><i className="berth-3d-bollard-key" /> Cabeços numerados</span>
++      </div>
++      {assignedLines.length > 0 && (
++        <details className="berth-3d-connections">
++          <summary>Ver cabeços usados nas amarrações ({assignedLines.length})</summary>
++          <div className="berth-3d-connections-list">
++            {assignedLines.map(({ vessel, line }) => (
++              <span key={`${vessel.id}-${line.id}`}>
++                {vessel.name || "Navio"} · {MOORING_LINE_LABELS[line.type]} → cabeço {line.bollardId}
++              </span>
++            ))}
++          </div>
++        </details>
++      )}
++      <div className="berth-3d-canvas-wrap" ref={hostRef}>
++        {status === "loading" && <div className="berth-3d-state">Carregando a vista 3D…</div>}
++        {status === "error" && <div className="berth-3d-state berth-3d-error" role="alert">{error}</div>}
++        {status === "ready" && scenario.vessels.length === 0 && <div className="berth-3d-empty">Adicione um navio para compor este cenário.</div>}
++      </div>
++      <p className="berth-3d-caveat">
++        Modelo visual esquemático — altura e perfil dos navios são ilustrativos, pois não há cadastro de altura total. Não destinado à validação de segurança ou amarração. {estimatedBollards > 0
++          ? `${estimatedBollards} posição(ões) de cabeço sem levantamento são ilustrativas.`
++          : `Cais: ${total.toLocaleString("pt-BR")} m.`}
++      </p>
++    </div>
++  );
++}
+diff --git a/client/src/pages/Simulator.tsx b/client/src/pages/Simulator.tsx
+index 54d0dcf..6a78583 100644
+--- a/client/src/pages/Simulator.tsx
++++ b/client/src/pages/Simulator.tsx
+@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
+ import {
+   Anchor,
+   AlertTriangle,
++  Box,
+   CheckCircle2,
+   CircleHelp,
+   Info,
+@@ -29,6 +30,7 @@ import {
+   DialogTrigger,
+ } from "@/components/ui/dialog";
+ import BerthBlueprint from "@/components/berth-blueprint";
++import Berth3DViewer from "@/components/Berth3DViewer";
+ import AddVesselModal from "@/components/AddVesselModal";
+ import BerthViewModal from "@/components/BerthViewModal";
+ import {
+@@ -560,6 +562,24 @@ export default function Simulator() {
+                 <p>Arraste um navio para reposicionar e a ponta do cabo para escolher o cabeço.</p>
+               </div>
+               <div className="blueprint-controls">
++                <Dialog>
++                  <DialogTrigger asChild>
++                    <button className="button button-primary berth-3d-trigger" type="button" aria-haspopup="dialog" title="Abrir a visualização tridimensional do cenário">
++                      <Box size={16} /> <span>Abrir vista 3D</span>
++                    </button>
++                  </DialogTrigger>
++                  <DialogContent className="berth-3d-dialog">
++                    <DialogHeader className="berth-3d-dialog-header">
++                      <div className="section-kicker">MODELO ESQUEMÁTICO</div>
++                      <DialogTitle>Visualização 3D da atracação</DialogTitle>
++                      <DialogDescription>
++                        Gire e amplie a cena. O modelo usa os dados deste cenário e não altera suas posições.
++                      </DialogDescription>
++                    </DialogHeader>
++                    <Berth3DViewer scenario={scenario} />
++                  </DialogContent>
++                </Dialog>
++
+                 <label className="clearance-control" htmlFor="clearance-input">
+                   <span>Afastamento mínimo</span>
+                   <input id="clearance-input" type="number" min="0" step="1" value={scenario.clearance} onChange={(event) => patchScenario({ clearance: Math.max(0, Number(event.target.value)) })} />
+diff --git a/package.json b/package.json
+index a3d53b1..2eaed5d 100644
+--- a/package.json
++++ b/package.json
+@@ -78,6 +78,7 @@
+     "superjson": "^1.13.3",
+     "tailwind-merge": "^3.3.1",
+     "tailwindcss-animate": "^1.0.7",
++    "three": "^0.186.1",
+     "vaul": "^1.1.2",
+     "wouter": "^3.3.5",
+     "zod": "^4.1.12"
+@@ -91,6 +92,7 @@
+     "@types/node": "^24.7.0",
+     "@types/react": "^19.2.1",
+     "@types/react-dom": "^19.2.1",
++    "@types/three": "^0.186.0",
+     "@vitejs/plugin-react": "^5.0.4",
+     "add": "^2.0.6",
+     "autoprefixer": "^10.4.20",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 7e67554..545c6f7 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -199,6 +199,9 @@ importers:
+       tailwindcss-animate:
+         specifier: ^1.0.7
+         version: 1.0.7(tailwindcss@4.1.14)
++      three:
++        specifier: ^0.186.1
++        version: 0.186.1
+       vaul:
+         specifier: ^1.1.2
+         version: 1.1.2(@types/react-dom@19.2.1(@types/react@19.2.1))(@types/react@19.2.1)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+@@ -233,6 +236,9 @@ importers:
+       '@types/react-dom':
+         specifier: ^19.2.1
+         version: 19.2.1(@types/react@19.2.1)
++      '@types/three':
++        specifier: ^0.186.0
++        version: 0.186.0
+       '@vitejs/plugin-react':
+         specifier: ^5.0.4
+         version: 5.0.4(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))
+@@ -566,6 +572,9 @@ packages:
+   '@date-fns/tz@1.4.1':
+     resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
+ 
++  '@dimforge/rapier3d-compat@0.12.0':
++    resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
++
+   '@drizzle-team/brocli@0.10.2':
+     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
+ 
+@@ -2144,6 +2153,9 @@ packages:
+     peerDependencies:
+       typescript: '>=5.7.2'
+ 
++  '@tweenjs/tween.js@23.1.3':
++    resolution: {integrity: sha512-vJmvvwFxYuGnF2axRtPYocag6Clbb5YS7kLL+SO/TeVFzHqDIWrNKYtcsPMibjDx9O+bu+psAy9NKfWklassUA==}
++
+   '@types/babel__core@7.20.5':
+     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
+ 
+@@ -2320,6 +2332,12 @@ packages:
+   '@types/serve-static@1.15.9':
+     resolution: {integrity: sha512-dOTIuqpWLyl3BBXU3maNQsS4A3zuuoYRNIvYSxxhebPfXg2mzWQEPne/nlJ37yOse6uGgR386uTpdsx4D0QZWA==}
+ 
++  '@types/stats.js@0.17.4':
++    resolution: {integrity: sha512-jIBvWWShCvlBqBNIZt0KAshWpvSjhkwkEu4ZUcASoAvhmrgAUI2t1dXrjSL4xXVLB4FznPrIsX3nKXFl/Dt4vA==}
++
++  '@types/three@0.186.0':
++    resolution: {integrity: sha512-mxYSBpDC+D0pLfSP6sW4WZTcT+nrtmZcimMqnVmy36Hte3XpeYSrvgg4TRdaM1GemGog1AWzI5qL2VoIfMXbJQ==}
++
+   '@types/trusted-types@2.0.7':
+     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+ 
+@@ -2329,6 +2347,9 @@ packages:
+   '@types/unist@3.0.3':
+     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+ 
++  '@types/webxr@0.5.24':
++    resolution: {integrity: sha512-h8fgEd/DpoS9CBrjEQXR+dIDraopAEfu4wYVNY2tEPwk60stPWhvZMf4Foo5FakuQ7HFZoa8WceaWFervK2Ovg==}
++
+   '@ungap/structured-clone@1.3.0':
+     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+     deprecated: Potential CWE-502 - Update to 1.3.1 or higher
+@@ -3034,6 +3055,9 @@ packages:
+       picomatch:
+         optional: true
+ 
++  fflate@0.8.3:
++    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
++
+   finalhandler@1.3.1:
+     resolution: {integrity: sha512-6BN9trH7bp3qvnrRyzsBz+g3lZxTNZTbVO2EV1CS0WIcDbawYVdYvGflME/9QP0h0pYlCDBCTjYa9nZzMDpyxQ==}
+     engines: {node: '>= 0.8'}
+@@ -3463,6 +3487,9 @@ packages:
+   mermaid@11.12.0:
+     resolution: {integrity: sha512-ZudVx73BwrMJfCFmSSJT84y6u5brEoV8DOItdHomNLz32uBjNrelm7mg95X7g+C6UoQH/W6mBLGDEDv73JdxBg==}
+ 
++  meshoptimizer@1.1.1:
++    resolution: {integrity: sha512-oRFNWJRDA/WTrVj7NWvqa5HqE1t9MYDj2VaWirQCzCCrAd2GHrqR/sQezCxiWATPNlKTcRaPRHPJwIRoPBAp5g==}
++
+   methods@1.1.2:
+     resolution: {integrity: sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==}
+     engines: {node: '>= 0.6'}
+@@ -4035,6 +4062,9 @@ packages:
+     engines: {node: '>=18'}
+     deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+ 
++  three@0.186.1:
++    resolution: {integrity: sha512-blFeqb49wRCSGUGj7gtpfnSGHy2lwDk94RhUmS1c/hTby70kvChbWpkJ4Pm1390LqzzvTmzgXKHPEafJwCb8jA==}
++
+   tiny-invariant@1.3.3:
+     resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
+ 
+@@ -4988,6 +5018,8 @@ snapshots:
+ 
+   '@date-fns/tz@1.4.1': {}
+ 
++  '@dimforge/rapier3d-compat@0.12.0': {}
++
+   '@drizzle-team/brocli@0.10.2': {}
+ 
+   '@epic-web/invariant@1.0.0': {}
+@@ -6473,6 +6505,8 @@ snapshots:
+     dependencies:
+       typescript: 5.9.3
+ 
++  '@tweenjs/tween.js@23.1.3': {}
++
+   '@types/babel__core@7.20.5':
+     dependencies:
+       '@babel/parser': 7.28.4
+@@ -6695,6 +6729,17 @@ snapshots:
+       '@types/node': 24.7.0
+       '@types/send': 0.17.5
+ 
++  '@types/stats.js@0.17.4': {}
++
++  '@types/three@0.186.0':
++    dependencies:
++      '@dimforge/rapier3d-compat': 0.12.0
++      '@tweenjs/tween.js': 23.1.3
++      '@types/stats.js': 0.17.4
++      '@types/webxr': 0.5.24
++      fflate: 0.8.3
++      meshoptimizer: 1.1.1
++
+   '@types/trusted-types@2.0.7':
+     optional: true
+ 
+@@ -6702,6 +6747,8 @@ snapshots:
+ 
+   '@types/unist@3.0.3': {}
+ 
++  '@types/webxr@0.5.24': {}
++
+   '@ungap/structured-clone@1.3.0': {}
+ 
+   '@vitejs/plugin-react@5.0.4(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))':
+@@ -7412,6 +7459,8 @@ snapshots:
+     optionalDependencies:
+       picomatch: 4.0.3
+ 
++  fflate@0.8.3: {}
++
+   finalhandler@1.3.1:
+     dependencies:
+       debug: 2.6.9
+@@ -7995,6 +8044,8 @@ snapshots:
+     transitivePeerDependencies:
+       - supports-color
+ 
++  meshoptimizer@1.1.1: {}
++
+   methods@1.1.2: {}
+ 
+   micromark-core-commonmark@2.0.3:
+@@ -8771,6 +8822,8 @@ snapshots:
+       minizlib: 3.1.0
+       yallist: 5.0.0
+ 
++  three@0.186.1: {}
++
+   tiny-invariant@1.3.3: {}
+ 
+   tinybench@2.9.0: {}

@@ -17,6 +17,7 @@ A ferramenta permite aos operadores e práticos simular o posicionamento métric
 - [Visão Geral](#-visão-geral)
 - [Funcionalidades Principais](#-funcionalidades-principais)
 - [Tecnologias Utilizadas](#-tecnologias-utilizadas)
+- [Visualização 3D](#7-visualização-3d-esquemática)
 - [Instalação e Execução](#-instalação-e-execução)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Guia de Manutenção e Configuração](#-guia-de-manutenção-e-configuração)
@@ -73,6 +74,14 @@ O simulador transforma cálculos complexos em um **Blueprint visual 2D em escala
 - Banco de navios com dimensões reais (LOA, Boca, Calado, Tipo de Embarcação).
 - Persistência contínua no navegador (`localStorage`) e capacidade de exportação/importação de cenários completos em JSON.
 
+### 7. Visualização 3D Esquemática
+- O botão **`Visualização 3D`** (na barra superior e na régua de controles) abre uma representação tridimensional do cenário atual, sem alterar os dados ou substituir o blueprint 2D.
+- Usa um modelo procedural de alta fidelidade: casco longitudinal com 9 balizas e curvas de bojo (*bilge*), convés contornado com amurada, fileiras de contêineres coloridas com cantoneiras, ponte escalonada com janelas e identificação lateral (*nameplate*); modelos especializados para Porta-Contêineres, Petroleiros/Químicos (manifold e tubovias), Carga Geral/Graneleiros (escotilhas e paus de carga) e Apoio Offshore (PSV/AHTS).
+- Mostra também cabos de amarração em catenária (*tube bezier*), cais com guia de acostagem e trilhos de guindaste, cabeços com numeração em sprites 3D, defensas e escadas de portaló.
+- Os portêineres mostram pernas inclinadas de terra e de mar, pórtico com contraventamentos, bogies com oito rodas por canto, casa de máquinas/contrapeso, carretel de cabo, torre e tirantes, lança treliçada, trolley com cabine, cabos de içamento e spreader.
+- Controles de órbita, aproximação/afastamento (*zoom*) e deslocamento (*pan*); botão **`Restaurar enquadramento`** retorna à perspectiva inicial.
+- Renderização sob demanda baseada em Three.js/WebGL 2, sem consumo ocioso de GPU quando a câmera está imóvel.
+
 ---
 
 ## 🛠️ Tecnologias Utilizadas
@@ -81,7 +90,8 @@ O simulador transforma cálculos complexos em um **Blueprint visual 2D em escala
 |---|---|---|
 | **Linguagem** | TypeScript 5.6 | Tipagem estática rigorosa para física, coordenadas e modelos portuários |
 | **Interface** | React 19 | Arquitetura reativa de componentes e controle de estado |
-| **Renderizador** | SVG (Scalable Vector Graphics) | Precisão métrica, zoom contínuo e renderização nítida sem perda de qualidade |
+| **Renderizador 2D** | SVG (Scalable Vector Graphics) | Precisão métrica, zoom contínuo e renderização nítida sem perda de qualidade |
+| **Visualizador 3D** | Three.js / WebGL 2 | Modelo esquemático sob demanda com câmera orbital; licença MIT |
 | **Estilização** | CSS3 & TailwindCSS | Interface moderna, responsiva, contrastada e com estética náutica profissional |
 | **Ícones** | Lucide React | Ícones operacionais limpos e consistentes |
 | **Build & Dev** | Vite 7.1 | Inicialização instantânea e empacotamento ultrarrápido |

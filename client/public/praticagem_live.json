@@ -1,38 +1,8 @@
 {
-  "updatedAt": "05/10/2026 08:22",
+  "updatedAt": "05/10/2026 10:39",
   "terminal": "Tecon Rio (Prolongamento / Tecon 1)",
-  "count": 7,
+  "count": 5,
   "maneuvers": [
-    {
-      "dateTime": "05/10 02:00",
-      "name": "COSCO SHIPPING ARGENTINA",
-      "draft": 14.3,
-      "loa": 335.95,
-      "beam": 51.04,
-      "maneuver": "E",
-      "berthFrom": "",
-      "berthTo": "TECONT1",
-      "berthingSide": "bombordo",
-      "imo": "9945849",
-      "type": "CONTAINER SHIP (FULLY CELLULAR)",
-      "flag": "HONG KONG, CHINA",
-      "terminal": "rio"
-    },
-    {
-      "dateTime": "05/10 04:30",
-      "name": "OCEAN MERMAID",
-      "draft": 6.0,
-      "loa": 69.8,
-      "beam": 17.0,
-      "maneuver": "E",
-      "berthFrom": "",
-      "berthTo": "TECONT1",
-      "berthingSide": "boreste",
-      "imo": "9742443",
-      "type": "RESEARCH SURVEY VESSEL",
-      "flag": "BAHAMAS",
-      "terminal": "rio"
-    },
     {
       "dateTime": "05/10 19:00",
       "name": "EVER FAR",
@@ -66,7 +36,7 @@
     {
       "dateTime": "06/10 17:00",
       "name": "NC BREDA",
-      "draft": 8.0,
+      "draft": 8,
       "loa": 223.98,
       "beam": 34.88,
       "maneuver": "E",
@@ -82,7 +52,7 @@
       "dateTime": "07/10 12:00",
       "name": "KOTA PAHLAWAN",
       "draft": 15.3,
-      "loa": 330.0,
+      "loa": 330,
       "beam": 48.34,
       "maneuver": "E",
       "berthFrom": "",

@@ -884,9 +884,14 @@ export default function AddVesselModal({
                   onChange={(e) => setManualType(e.target.value as VesselType)}
                   className="w-full px-3 py-2 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a] bg-white font-medium text-[#1e293b]"
                 >
-                  <option value="container">Porta-Contêineres (Container Ship) — Baías de contêineres e castelo de ré</option>
-                  <option value="general-cargo">Carga Geral / Graneleiro (General Cargo Ship) — Porões com escotilhas e guindastes</option>
-                  <option value="tanker">Petroleiro / Químico (Chemical/Products Tanker) — Manifold, tubulações e domos</option>
+                  <option value="container">Porta-Contêineres (Container Ship Fully Cellular)</option>
+                  <option value="chemical-tanker">Navio Tanque Químico (Chemical Tanker)</option>
+                  <option value="product-tanker">Petroleiro de Produtos (Product Tanker)</option>
+                  <option value="tanker">Petroleiro / Químico Geral (Tanker)</option>
+                  <option value="offshore">Apoio Offshore (Platform Supply Ship / PSV / AHTS)</option>
+                  <option value="diving-support">Apoio a Mergulho / Subsea (Diving Support Vessel - DSV)</option>
+                  <option value="general-cargo">Carga Geral / Graneleiro (General Cargo / Bulk)</option>
+                  <option value="research-survey">Pesquisa / Hidrográfico (Research Survey Vessel)</option>
                 </select>
               </div>
 

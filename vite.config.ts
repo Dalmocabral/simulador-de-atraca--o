@@ -193,26 +193,20 @@ function vitePluginPraticagemApi(): Plugin {
       });
 
       // POST /api/praticagem/sync
-      server.middlewares.use("/api/praticagem/sync", (req, res, next) => {
+      server.middlewares.use("/api/praticagem/sync", async (req, res, next) => {
         if (req.method !== "POST") return next();
-        import("node:child_process").then(({ exec }) => {
-          exec(`${pythonExe} "${pythonScript}"`, (err, stdout) => {
-            if (err) {
-              res.statusCode = 500;
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify({ status: "error", message: String(err) }));
-              return;
-            }
-            let result = { status: "success", maneuversCount: 0, catalogCount: 0 };
-            try {
-              const lines = stdout.trim().split("\n");
-              const lastLine = lines[lines.length - 1];
-              result = JSON.parse(lastLine);
-            } catch {}
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify(result));
-          });
-        });
+        try {
+          const { createRequire } = await import("node:module");
+          const customRequire = createRequire(import.meta.url);
+          const { syncPraticagem } = customRequire("./electron/praticagem-sync.cjs");
+          const result = await syncPraticagem(publicDir, PROJECT_ROOT, () => {});
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ status: "success", maneuversCount: result.count }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ status: "error", message: String(err) }));
+        }
       });
 
       // /api/catalog/vessels
