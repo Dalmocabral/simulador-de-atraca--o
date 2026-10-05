@@ -16,7 +16,7 @@ import { exportAndShareBerthImage } from "@/lib/export-image";
 
 export default function BerthStandaloneView() {
   const [scenario, setScenario] = useState<Scenario>(() => readScenario());
-  const [zoom, setZoom] = useState(2.04);
+  const [zoom, setZoom] = useState(1.5);
   const [isExporting, setIsExporting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,7 +37,7 @@ export default function BerthStandaloneView() {
     }
   }
 
-  async function handleDownload() {
+  async function handleDownload(format: "jpeg" | "png" = "jpeg") {
     if (isExporting || isDownloading) return;
     setIsDownloading(true);
     try {
@@ -47,6 +47,8 @@ export default function BerthStandaloneView() {
         scenarioName: scenario.name,
         vesselName: primaryVessel,
         downloadOnly: true,
+        format,
+        scale: 4.5,
       });
     } finally {
       setIsDownloading(false);
@@ -113,8 +115,9 @@ export default function BerthStandaloneView() {
             </button>
             <button
               type="button"
-              onClick={() => setZoom(2.04)}
+              onClick={() => setZoom(1.5)}
               className="px-2 py-0.5 text-xs font-mono font-bold text-cyan-400 hover:text-white hover:bg-slate-700 rounded transition"
+              title="Restaurar zoom padrão 150%"
             >
               {Math.round(zoom * 100)}%
             </button>
@@ -136,16 +139,25 @@ export default function BerthStandaloneView() {
             </button>
           </div>
 
-          {/* Botão Salvar Imagem Diretamente no PC */}
+          {/* Botões Salvar Imagem Diretamente no PC */}
           <button
             type="button"
-            onClick={handleDownload}
+            onClick={() => handleDownload("jpeg")}
             disabled={isDownloading || isExporting}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white border border-slate-600/90 font-bold rounded-lg text-xs shadow-sm transition disabled:opacity-50 select-none cursor-pointer"
-            title="Baixar imagem do cais em alta definição diretamente no seu PC"
+            title="Baixar imagem em Ultra Alta Definição (JPG ~3MB / 300 DPI / 4700px)"
           >
             <Download size={14} className="text-cyan-400" />
-            <span>{isDownloading ? "Salvando..." : "Salvar no PC"}</span>
+            <span>{isDownloading ? "Salvando..." : "Salvar no PC (HD)"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownload("png")}
+            disabled={isDownloading || isExporting}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-600/60 font-semibold rounded-lg text-xs shadow-sm transition disabled:opacity-50 select-none cursor-pointer"
+            title="Baixar cópia sem perdas em formato PNG 4K"
+          >
+            <span>PNG 4K</span>
           </button>
 
           {/* Botão Compartilhar Imagem em Alta Definição para WhatsApp */}

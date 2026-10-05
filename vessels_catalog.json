@@ -9,12 +9,12 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "MALTA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "05/10/2026 08:22"
   },
   {
     "name": "CMA CGM PUCCINI",
-    "loa": 277.0,
-    "beam": 40.0,
+    "loa": 277,
+    "beam": 40,
     "draft": 11.65,
     "berthingSide": "boreste",
     "imo": "9280627",
@@ -27,13 +27,13 @@
     "name": "COSCO SHIPPING ARGENTINA",
     "loa": 335.95,
     "beam": 51.04,
-    "draft": 14.2,
-    "berthingSide": "boreste",
+    "draft": 14.3,
+    "berthingSide": "bombordo",
     "imo": "9945849",
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "HONG KONG, CHINA",
-    "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "lastBerth": "TECONT1",
+    "updatedAt": "05/10/2026 08:22"
   },
   {
     "name": "COSCO SHIPPING BRAZIL",
@@ -63,13 +63,13 @@
     "name": "EVER FAR",
     "loa": 333.9,
     "beam": 48.43,
-    "draft": 14.9,
+    "draft": 12.6,
     "berthingSide": "boreste",
     "imo": "9850862",
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "05/10/2026 08:22"
   },
   {
     "name": "EVER FASHION",
@@ -93,7 +93,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "SINGAPORE",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "05/10/2026 08:22"
   },
   {
     "name": "KOTA PAHLAWAN",
@@ -105,13 +105,13 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "SINGAPORE",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "05/10/2026 08:22"
   },
   {
     "name": "LOG-IN PANTANAL",
     "loa": 182.47,
     "beam": 25.2,
-    "draft": 9.0,
+    "draft": 9,
     "berthingSide": "boreste",
     "imo": "9351799",
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
@@ -135,17 +135,17 @@
     "name": "MALIAKOS",
     "loa": 262.08,
     "beam": 32.25,
-    "draft": 12.0,
+    "draft": 12,
     "berthingSide": "boreste",
     "imo": "9464247",
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "02/10/2026 11:12"
   },
   {
     "name": "NC BRAVO",
-    "loa": 224.0,
+    "loa": 224,
     "beam": 34.89,
     "draft": 11.4,
     "berthingSide": "boreste",
@@ -153,7 +153,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "BRAZIL",
     "lastBerth": "TECONT1",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "02/10/2026 14:52"
   },
   {
     "name": "NC BREDA",
@@ -165,7 +165,19 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "BRAZIL",
     "lastBerth": "TECONT1",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "05/10/2026 08:22"
+  },
+  {
+    "name": "OCEAN MERMAID",
+    "loa": 69.8,
+    "beam": 17.0,
+    "draft": 6.0,
+    "berthingSide": "boreste",
+    "imo": "9742443",
+    "type": "RESEARCH SURVEY VESSEL",
+    "flag": "BAHAMAS",
+    "lastBerth": "TECONT1",
+    "updatedAt": "05/10/2026 08:22"
   },
   {
     "name": "TOKYO EXPRESS",

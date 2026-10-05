@@ -5,11 +5,15 @@ export async function exportAndShareBerthImage({
   scenarioName,
   vesselName,
   downloadOnly = false,
+  format = "jpeg",
+  scale = 4.5,
 }: {
   containerElement: HTMLElement | null;
   scenarioName: string;
   vesselName?: string;
   downloadOnly?: boolean;
+  format?: "png" | "jpeg";
+  scale?: number;
 }): Promise<boolean> {
   if (!containerElement) {
     toast.error("Visualizador do cais não encontrado para exportação.");
@@ -24,31 +28,51 @@ export async function exportAndShareBerthImage({
 
   try {
     const viewBox = svgElement.viewBox.baseVal;
-    const origWidth = viewBox.width || svgElement.clientWidth || 1100;
+    const origWidth = viewBox.width || svgElement.clientWidth || 1050;
     const origHeight = viewBox.height || svgElement.clientHeight || 420;
 
-    // Escala de alta definição (2.5x -> ~2750px de largura, ultra nítida e formato ideal para WhatsApp)
-    const exportScale = 2.5;
+    // Escala Ultra HD (4.5x -> ~4725px de largura, qualidade de impressão e telões CCO)
+    const exportScale = Math.max(3.5, scale);
     const canvasWidth = Math.round(origWidth * exportScale);
     const canvasHeight = Math.round(origHeight * exportScale);
 
     const canvas = document.createElement("canvas");
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) {
       toast.error("Não foi possível inicializar o canvas de alta resolução.");
       return false;
     }
 
-    // 1. Fundo do mar/cais
-    ctx.fillStyle = "#eef4f7";
+    // Configurações de nitidez e antialiasing profissional
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    // 1. Fundo do mar/cais (branco sólido para evitar artefatos em JPEG)
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // 2. Serializar o SVG do blueprint
+    // 2. Serializar o SVG do blueprint com injeção de CSS
     const svgClone = svgElement.cloneNode(true) as SVGSVGElement;
     svgClone.setAttribute("width", String(canvasWidth));
     svgClone.setAttribute("height", String(canvasHeight));
+
+    // Coleta todas as regras CSS ativas para que as fontes, espessuras e cores fiquem idênticas
+    let allCss = "";
+    try {
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          for (const rule of Array.from(sheet.cssRules)) {
+            allCss += rule.cssText + "\n";
+          }
+        } catch {}
+      }
+    } catch {}
+
+    const styleTag = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    styleTag.textContent = allCss;
+    svgClone.insertBefore(styleTag, svgClone.firstChild);
 
     const svgXml = new XMLSerializer().serializeToString(svgClone);
     const svgBlob = new Blob([svgXml], { type: "image/svg+xml;charset=utf-8" });
@@ -64,12 +88,12 @@ export async function exportAndShareBerthImage({
     ctx.drawImage(svgImg, 0, 0, canvasWidth, canvasHeight);
     URL.revokeObjectURL(svgUrl);
 
-    // 3. Desenhar a Logo da empresa no canto superior esquerdo (sem bordas e sem sombra)
+    // 3. Desenhar a Logo da empresa no canto superior esquerdo em alta resolução
     try {
       const logoImg = new Image();
       await new Promise<void>((resolve) => {
         logoImg.onload = () => resolve();
-        logoImg.onerror = () => resolve(); // se não encontrar, continua normalmente
+        logoImg.onerror = () => resolve();
         logoImg.src = "/logo.png";
       });
 
@@ -89,7 +113,28 @@ export async function exportAndShareBerthImage({
       console.warn("Logo overlay ignorado:", logoErr);
     }
 
-    // 4. Gerar Blob em PNG de Alta Qualidade
+    // 4. Marca d'água técnica de alta resolução no canto superior direito
+    try {
+      const paddingX = Math.round(20 * exportScale);
+      const paddingY = Math.round(20 * exportScale);
+      const fontSize = Math.round(7.5 * exportScale);
+      ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.fillStyle = "#0f2331";
+      ctx.textAlign = "right";
+      ctx.fillText("PLANO DE ATRACAÇÃO · TERMINAL RIO", canvasWidth - paddingX, paddingY + fontSize);
+
+      const subFontSize = Math.round(5.5 * exportScale);
+      ctx.font = `600 ${subFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.fillStyle = "#55707d";
+      const nowStr = new Date().toLocaleDateString("pt-BR") + " " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      ctx.fillText(`Gerado em ${nowStr} · Ultra HD (${canvasWidth} × ${canvasHeight} px)`, canvasWidth - paddingX, paddingY + fontSize + subFontSize + 4 * exportScale);
+    } catch {}
+
+    // 5. Gerar Blob em Alta Qualidade (JPEG com 98% de qualidade ou PNG)
+    const mimeType = format === "jpeg" ? "image/jpeg" : "image/png";
+    const fileExt = format === "jpeg" ? "jpg" : "png";
+    const quality = format === "jpeg" ? 0.98 : undefined;
+
     return await new Promise<boolean>((resolve) => {
       canvas.toBlob(
         async (blob) => {
@@ -101,8 +146,13 @@ export async function exportAndShareBerthImage({
 
           const rawTitle = vesselName || scenarioName || "plano-atracacao";
           const safeName = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
-          const fileName = `atracacao-${safeName}.png`;
-          const file = new File([blob], fileName, { type: "image/png" });
+          const fileName = `atracacao-${safeName}-ultrahd.${fileExt}`;
+          const file = new File([blob], fileName, { type: mimeType });
+
+          // Tamanho formatado em MB ou KB para exibição informativa
+          const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+          const fileSizeKB = (blob.size / 1024).toFixed(0);
+          const sizeText = blob.size >= 1024 * 1024 ? `${fileSizeMB} MB` : `${fileSizeKB} KB`;
 
           // Tentar compartilhar nativamente pelo sistema (se o usuário estiver no WhatsApp ou mobile/Windows e NÃO for download direto)
           let sharedNatively = false;
@@ -111,17 +161,17 @@ export async function exportAndShareBerthImage({
               await navigator.share({
                 files: [file],
                 title: `Plano de Atracação · ${rawTitle}`,
-                text: `Plano de atracação oficial em alta resolução`,
+                text: `Plano de atracação oficial em Ultra Alta Resolução (${canvasWidth}x${canvasHeight}px, ${sizeText})`,
               });
               sharedNatively = true;
             } catch (err: any) {
               if (err.name !== "AbortError") {
-                console.warn("Compartilhamento nativo cancelado ou não suportado:", err);
+                console.warn("Compartilhamento nativo cancelado:", err);
               }
             }
           }
 
-          // Se for downloadOnly ou não compartilhou via janela nativa, faz o download automático do PNG no PC
+          // Se for downloadOnly ou não compartilhou via janela nativa, faz o download automático
           if (downloadOnly || !sharedNatively) {
             const downloadUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -133,10 +183,10 @@ export async function exportAndShareBerthImage({
             URL.revokeObjectURL(downloadUrl);
           }
 
-          // Copiar para a área de transferência para colar diretamente com Ctrl + V no WhatsApp Web ou outros apps
+          // Copiar para a área de transferência se suportado
           let copiedToClipboard = false;
           try {
-            if (navigator.clipboard && window.ClipboardItem) {
+            if (navigator.clipboard && window.ClipboardItem && mimeType === "image/png") {
               await navigator.clipboard.write([
                 new ClipboardItem({
                   "image/png": blob,
@@ -149,19 +199,19 @@ export async function exportAndShareBerthImage({
           }
 
           if (downloadOnly) {
-            toast.success("Imagem em alta definição salva com sucesso no seu computador!");
+            toast.success(`Imagem salva com sucesso! Resolução Ultra HD: ${canvasWidth}×${canvasHeight}px (${sizeText}).`);
           } else if (sharedNatively) {
             toast.success("Plano compartilhado com sucesso!");
           } else if (copiedToClipboard) {
-            toast.success("Imagem em alta definição baixada e copiada! Cole (Ctrl+V) direto no WhatsApp.");
+            toast.success(`Imagem Ultra HD (${canvasWidth}×${canvasHeight}px, ${sizeText}) baixada e copiada para a área de transferência!`);
           } else {
-            toast.success("Imagem em alta definição baixada com sucesso para o WhatsApp!");
+            toast.success(`Imagem Ultra HD baixada com sucesso (${canvasWidth}×${canvasHeight}px, ${sizeText})!`);
           }
 
           resolve(true);
         },
-        "image/png",
-        0.98
+        mimeType,
+        quality
       );
     });
   } catch (error) {

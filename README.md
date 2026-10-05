@@ -114,13 +114,25 @@ O simulador transforma cálculos complexos em um **Blueprint visual 2D em escala
    ```
    Acesse a aplicação no navegador em: `http://localhost:5173`
 
-4. **Compilar para Produção (Build):**
+4. **Compilar para Produção (Build Web):**
    ```bash
    npm run build
    ```
    Os arquivos otimizados serão gerados na pasta `dist/`.
 
-5. **Executar a Verificação de Tipos (TypeScript Check):**
+5. **Gerar os Executáveis Desktop (.exe para Windows):**
+   ```bash
+   # Gerar tanto o Instalador (.exe) quanto a Versão Portátil (.exe):
+   npm run electron:all
+
+   # Ou para testar no ambiente de desenvolvimento:
+   npm run electron:dev
+   ```
+   Os executáveis gerados ficam disponíveis na pasta `dist-electron/`:
+   - 📦 `Simulador de Atracação Setup 1.0.0.exe`: Instalador completo (com atalhos no Desktop e Menu Iniciar).
+   - 🚀 `Simulador_de_Atracacao_Portatil.exe`: Versão portátil (roda direto sem precisar instalar).
+
+6. **Executar a Verificação de Tipos (TypeScript Check):**
    ```bash
    npm run check
    ```

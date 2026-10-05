@@ -19,6 +19,8 @@ import {
   Sparkles,
   RotateCcw,
   Maximize2,
+  Box,
+  Layers,
 } from "lucide-react";
 import {
   Dialog,
@@ -31,6 +33,7 @@ import {
 import BerthBlueprint from "@/components/berth-blueprint";
 import AddVesselModal from "@/components/AddVesselModal";
 import BerthViewModal from "@/components/BerthViewModal";
+import Berth3DModal from "@/components/Berth3DModal";
 import {
   calculateIssues,
   createBollardInventory,
@@ -86,13 +89,29 @@ function safeWriteScenario(scenario: Scenario) {
 export default function Simulator() {
   const [scenario, setScenario] = useState<Scenario>(() => readScenario());
   const [selectedVesselId, setSelectedVesselId] = useState<string | null>(() => readScenario().vessels[0]?.id ?? null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("caislab:blueprint_zoom");
+      if (saved) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= 0.5 && val <= 4.0) return val;
+      }
+    } catch {}
+    return 1.5; // Padrão 150% para telas e executáveis
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("caislab:blueprint_zoom", String(zoom));
+    } catch {}
+  }, [zoom]);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [storageError, setStorageError] = useState(false);
   const [notice, setNotice] = useState("");
   const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false);
   const [isPortainerModalOpen, setIsPortainerModalOpen] = useState(false);
   const [isBerthViewModalOpen, setIsBerthViewModalOpen] = useState(false);
+  const [isBerth3DModalOpen, setIsBerth3DModalOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const bollardImportRef = useRef<HTMLInputElement>(null);
 
@@ -407,6 +426,7 @@ export default function Simulator() {
     const demo = createDemoScenario();
     setScenario(demo);
     setSelectedVesselId(demo.vessels[0]?.id ?? null);
+    setZoom(1.5);
     setNotice("Cenário demonstrativo restaurado; valores de cais são ilustrativos.");
   }
 
@@ -433,6 +453,27 @@ export default function Simulator() {
           <span className="saved-stamp">
             {storageError ? "Armazenamento indisponível" : lastSaved ? `Salvo ${lastSaved.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Salvando…"}
           </span>
+          {/* 1. Visualização 2D */}
+          <button
+            className="button button-quiet text-[#0284c7] hover:text-[#0369a1] hover:bg-sky-50 border border-sky-200/90 shadow-xs font-semibold"
+            type="button"
+            onClick={() => setIsBerthViewModalOpen(true)}
+            title="Abrir Visualização 2D técnica com dados do navio, cabeços e exportação em alta resolução"
+          >
+            <Layers size={14} className="text-[#0284c7]" /> <span>Visualização 2D</span>
+          </button>
+
+          {/* 2. Visualização 3D */}
+          <button
+            className="button button-quiet text-[#0d9488] hover:text-[#0f766e] hover:bg-teal-50 border border-teal-200/90 shadow-xs font-semibold"
+            type="button"
+            onClick={() => setIsBerth3DModalOpen(true)}
+            title="Abrir Visualização 3D interativa do cais, navios, portêineres e amarrações"
+          >
+            <Box size={14} className="text-[#0d9488]" /> <span>Visualização 3D</span>
+          </button>
+
+          {/* 3. Configurações */}
           <Dialog>
             <DialogTrigger asChild>
               <button className="button button-quiet" type="button" title="Configurações do cenário">
@@ -503,14 +544,6 @@ export default function Simulator() {
               </div>
             </DialogContent>
           </Dialog>
-          <button
-            className="button button-quiet text-[#0284c7] hover:text-[#0369a1] hover:bg-sky-50 border border-sky-200/90 shadow-xs font-semibold"
-            type="button"
-            onClick={() => setIsBerthViewModalOpen(true)}
-            title="Abrir View Atracação em janela ampliada ou maximizada com dados do navio e cabeços"
-          >
-            <Maximize2 size={14} className="text-[#0284c7]" /> <span>View Atracação</span>
-          </button>
           <input ref={importRef} type="file" accept="application/json,.json" className="visually-hidden" onChange={(event) => void importScenario(event.target.files?.[0])} />
         </div>
       </header>
@@ -1056,7 +1089,7 @@ export default function Simulator() {
           </DialogContent>
         </Dialog>
 
-        {/* Modal de Vista Operacional da Atracação com tela cheia e HUD no canto superior direito */}
+        {/* Modal de Vista Operacional da Atracação 2D */}
         <BerthViewModal
           isOpen={isBerthViewModalOpen}
           onClose={() => setIsBerthViewModalOpen(false)}
@@ -1068,6 +1101,13 @@ export default function Simulator() {
           onUpdateBollard={updateBollard}
           onMovePortainer={(id, position) => patchPortainer(id, { position })}
           onPortainerLimitHit={(msg) => setNotice(msg)}
+        />
+
+        {/* Modal de Visualização 3D Interativa */}
+        <Berth3DModal
+          isOpen={isBerth3DModalOpen}
+          onClose={() => setIsBerth3DModalOpen(false)}
+          scenario={scenario}
         />
       </main>
     </div>

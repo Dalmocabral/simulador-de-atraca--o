@@ -40,17 +40,32 @@ export interface MooringLine {
   bollardId: string | null;
 }
 
-export type VesselType = "container" | "general-cargo" | "tanker";
+export type VesselType = "container" | "general-cargo" | "tanker" | "offshore";
 
 export const VESSEL_TYPE_LABELS: Record<VesselType, string> = {
   "container": "Porta-Contêineres (Container Ship)",
   "general-cargo": "Carga Geral / Graneleiro (General Cargo Ship)",
   "tanker": "Petroleiro / Químico (Tanker)",
+  "offshore": "Apoio Offshore (PSV / AHTS / OSRV)",
 };
 
 export function normalizeVesselType(raw?: string | null): VesselType {
   if (!raw) return "container";
   const upper = raw.toUpperCase().trim();
+  if (
+    upper === "offshore" ||
+    upper.includes("OFFSHORE") ||
+    upper.includes("PSV") ||
+    upper.includes("AHTS") ||
+    upper.includes("SUPPLY") ||
+    upper.includes("TUG") ||
+    upper.includes("REBOCADOR") ||
+    upper.includes("OSRV") ||
+    upper.includes("DSV") ||
+    upper.includes("PLSV")
+  ) {
+    return "offshore";
+  }
   if (
     upper === "tanker" ||
     upper.includes("TANKER") ||
@@ -186,7 +201,7 @@ export interface BerthIssue {
   message: string;
 }
 
-export const STORAGE_KEY = "caislab:scenario:v4";
+export const STORAGE_KEY = "caislab:scenario:v5";
 
 export const VESSEL_COLORS: Record<VesselColor, { label: string; fill: string; stroke: string; accent: string }> = {
   blue: { label: "Azul", fill: "#3f779b", stroke: "#285a78", accent: "#b9dce9" },
@@ -354,41 +369,14 @@ export function parseBollardCsv(content: string, quayLength: number): Bollard[] 
 
 export function createDemoScenario(): Scenario {
   return {
-    name: "Cenário de referência",
+    name: "Plano de atracação",
     clearance: 15,
     segments: [
       { id: "segment-expansao", name: "Expansão", length: 85 },
       { id: "segment-prolongamento", name: "Prolongamento", length: 430 },
       { id: "segment-tecon", name: "Tecon 1", length: 385 },
     ],
-    vessels: [
-      {
-        id: "vessel-cosco",
-        name: "Cosco Shipping Chile",
-        loa: 336,
-        beam: 45,
-        draft: 13.8,
-        position: 100,
-        berthingSide: "boreste",
-        gangwayOffset: 168,
-        mooringLines: [],
-        color: "blue",
-        vesselType: "container",
-      },
-      {
-        id: "vessel-vermilion",
-        name: "Navios Vermilion",
-        loa: 260,
-        beam: 32,
-        draft: 11.5,
-        position: 560,
-        berthingSide: "boreste",
-        gangwayOffset: 130,
-        mooringLines: [],
-        color: "orange",
-        vesselType: "general-cargo",
-      },
-    ],
+    vessels: [],
     bollards: createBollardInventory(),
     portainers: DEFAULT_PORTAINERS.map((p) => ({ ...p })),
     showPortainers: true,
@@ -512,10 +500,7 @@ export function normalizeScenario(value: unknown): Scenario | null {
 export function readScenario(): Scenario {
   if (typeof window === "undefined") return createDemoScenario();
   try {
-    let raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      raw = window.localStorage.getItem("caislab:scenario:v3") || window.localStorage.getItem("caislab:scenario:v2") || window.localStorage.getItem("caislab:scenario:v1");
-    }
+    const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return createDemoScenario();
     const scenario = normalizeScenario(JSON.parse(raw));
     if (!scenario) return createDemoScenario();
