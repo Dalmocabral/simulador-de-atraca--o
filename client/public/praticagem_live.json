@@ -1,12 +1,12 @@
 {
-  "updatedAt": "05/10/2026 10:50",
+  "updatedAt": "06/10/2026 09:18",
   "terminal": "Tecon Rio (Prolongamento / Tecon 1)",
-  "count": 5,
+  "count": 6,
   "maneuvers": [
     {
-      "dateTime": "05/10 19:00",
+      "dateTime": "06/10 07:30",
       "name": "EVER FAR",
-      "draft": 12.6,
+      "draft": 14.7,
       "loa": 333.9,
       "beam": 48.43,
       "maneuver": "E",
@@ -16,21 +16,6 @@
       "imo": "9850862",
       "type": "CONTAINER SHIP (FULLY CELLULAR)",
       "flag": "LIBERIA",
-      "terminal": "rio"
-    },
-    {
-      "dateTime": "06/10 15:30",
-      "name": "EVER LEADER",
-      "draft": 12.5,
-      "loa": 334.98,
-      "beam": 45.83,
-      "maneuver": "E",
-      "berthFrom": "",
-      "berthTo": "TECONTPROLONG",
-      "berthingSide": "boreste",
-      "imo": "9595503",
-      "type": "CONTAINER SHIP (FULLY CELLULAR)",
-      "flag": "SINGAPORE",
       "terminal": "rio"
     },
     {
@@ -64,6 +49,21 @@
       "terminal": "rio"
     },
     {
+      "dateTime": "08/10 15:30",
+      "name": "EVER LEADER",
+      "draft": 12.5,
+      "loa": 334.98,
+      "beam": 45.83,
+      "maneuver": "E",
+      "berthFrom": "",
+      "berthTo": "TECONTPROLONG",
+      "berthingSide": "boreste",
+      "imo": "9595503",
+      "type": "CONTAINER SHIP (FULLY CELLULAR)",
+      "flag": "SINGAPORE",
+      "terminal": "rio"
+    },
+    {
       "dateTime": "16/10 15:00",
       "name": "CMA CGM IRON",
       "draft": 14.7,
@@ -76,6 +76,21 @@
       "imo": "9996678",
       "type": "CONTAINER SHIP (FULLY CELLULAR)",
       "flag": "MALTA",
+      "terminal": "rio"
+    },
+    {
+      "dateTime": "18/10 06:00",
+      "name": "EVER FIT",
+      "draft": 14.4,
+      "loa": 333.9,
+      "beam": 48.43,
+      "maneuver": "E",
+      "berthFrom": "",
+      "berthTo": "TECONTPROLONG",
+      "berthingSide": "boreste",
+      "imo": "9850795",
+      "type": "CONTAINER SHIP (FULLY CELLULAR)",
+      "flag": "LIBERIA",
       "terminal": "rio"
     }
   ]

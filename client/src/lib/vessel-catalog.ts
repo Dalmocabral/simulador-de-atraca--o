@@ -1,8 +1,14 @@
+import { normalizeBayCount } from "./berth-model";
+
 export interface CatalogVessel {
   name: string;
   loa: number;
   beam: number;
   draft: number;
+  bayCount?: number;
+  /** @deprecated Campo legado, mantido apenas para importar catálogos anteriores. */
+  maxBayNumber?: number;
+  bays?: number;
   berthingSide: "boreste" | "bombordo";
   imo?: string;
   type?: string;
@@ -135,12 +141,16 @@ export async function fetchVesselCatalog(): Promise<CatalogVessel[]> {
  */
 export async function saveVesselToCatalog(vessel: CatalogVessel): Promise<CatalogVessel[]> {
   const cleanName = vessel.name.trim().toUpperCase();
+  const { maxBayNumber, ...currentFields } = vessel;
+  const bayCount = normalizeBayCount(vessel.bayCount ?? vessel.bays ?? maxBayNumber);
   const entry: CatalogVessel = {
-    ...vessel,
+    ...currentFields,
     name: cleanName,
     loa: Math.max(1, Number(vessel.loa) || 100),
     beam: Math.max(1, Number(vessel.beam) || 20),
     draft: Math.max(0, Number(vessel.draft) || 0),
+    bayCount,
+    bays: bayCount,
     berthingSide: vessel.berthingSide === "bombordo" ? "bombordo" : "boreste",
     updatedAt: new Date().toLocaleDateString("pt-BR") + " " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
   };
@@ -148,8 +158,24 @@ export async function saveVesselToCatalog(vessel: CatalogVessel): Promise<Catalo
   // Salvar no localStorage
   try {
     const current = await fetchVesselCatalog();
-    const map = new Map<string, CatalogVessel>(current.map((v) => [v.name.toUpperCase(), v]));
-    map.set(cleanName, entry);
+    const map = new Map<string, CatalogVessel>(current.map((v) => [v.name.trim().toUpperCase(), v]));
+    const existing = map.get(cleanName);
+    const definedFields = Object.fromEntries(
+      Object.entries(entry).filter(([, value]) => value !== undefined),
+    ) as Partial<CatalogVessel>;
+    const { maxBayNumber: _legacyBayNumber, ...existingFields } = existing ?? {};
+    const savedEntry: CatalogVessel = {
+      ...existingFields,
+      ...definedFields,
+      name: cleanName,
+      loa: entry.loa,
+      beam: entry.beam,
+      draft: entry.draft,
+      bayCount: entry.bayCount,
+      bays: entry.bayCount,
+      berthingSide: entry.berthingSide,
+    };
+    map.set(cleanName, savedEntry);
     const updatedList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
     localStorage.setItem(LOCAL_STORAGE_CATALOG_KEY, JSON.stringify(updatedList));
 
@@ -158,7 +184,7 @@ export async function saveVesselToCatalog(vessel: CatalogVessel): Promise<Catalo
       await fetch("/api/catalog/vessels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entry),
+        body: JSON.stringify(savedEntry),
       });
     } catch {
       // offline / static mode ok

@@ -39,6 +39,8 @@ import {
   type VesselColor,
   type VesselType,
   VESSEL_TYPE_LABELS,
+  MAX_BAY_COUNT,
+  normalizeBayCount,
   normalizeVesselType,
   VESSEL_COLORS,
   makeId,
@@ -85,6 +87,7 @@ export default function AddVesselModal({
   const [manualSide, setManualSide] = useState<BerthingSide>("boreste");
   const [manualColor, setManualColor] = useState<VesselColor>("blue");
   const [manualType, setManualType] = useState<VesselType>("container");
+  const [manualBays, setManualBays] = useState<number | undefined>(undefined);
   const [saveToCatalog, setSaveToCatalog] = useState(true);
 
   // Reset any accidental scroll when switching tabs
@@ -194,6 +197,8 @@ export default function AddVesselModal({
     const position = calculateNextPosition(loa, m.berthTo);
     const color = getNextColor();
     const vesselType = normalizeVesselType(m.type);
+    const savedVessel = catalog.find((item) => item.name.trim().toUpperCase() === m.name.trim().toUpperCase());
+    const bayCount = normalizeBayCount(savedVessel?.bayCount ?? savedVessel?.bays ?? savedVessel?.maxBayNumber);
 
     const newVessel: Vessel = {
       id,
@@ -207,6 +212,8 @@ export default function AddVesselModal({
       mooringLines: [],
       color,
       vesselType,
+      bayCount,
+      bays: bayCount,
     };
 
     // Auto save to persistent catalog
@@ -215,6 +222,8 @@ export default function AddVesselModal({
       loa,
       beam,
       draft,
+      bayCount,
+      bays: bayCount,
       berthingSide: side,
       imo: m.imo,
       type: m.type || VESSEL_TYPE_LABELS[vesselType],
@@ -241,6 +250,7 @@ export default function AddVesselModal({
     const position = calculateNextPosition(loa);
     const color = getNextColor();
     const vesselType = normalizeVesselType(v.type);
+    const bayCount = normalizeBayCount(v.bayCount ?? v.bays ?? v.maxBayNumber);
 
     const newVessel: Vessel = {
       id,
@@ -254,6 +264,8 @@ export default function AddVesselModal({
       mooringLines: [],
       color,
       vesselType,
+      bayCount,
+      bays: bayCount,
     };
 
     onAddVessel(
@@ -271,6 +283,7 @@ export default function AddVesselModal({
     const loa = Math.max(1, Number(manualLoa) || 180);
     const beam = Math.max(1, Number(manualBeam) || 32);
     const draft = Math.max(0, Number(manualDraft) || 10);
+    const bayCount = manualType === "container" ? normalizeBayCount(manualBays) : undefined;
     const position = calculateNextPosition(loa);
 
     const newVessel: Vessel = {
@@ -285,6 +298,8 @@ export default function AddVesselModal({
       mooringLines: [],
       color: manualColor,
       vesselType: manualType,
+      bayCount,
+      bays: bayCount,
     };
 
     if (saveToCatalog) {
@@ -293,6 +308,8 @@ export default function AddVesselModal({
         loa,
         beam,
         draft,
+        bayCount,
+        bays: bayCount,
         berthingSide: manualSide,
         type: VESSEL_TYPE_LABELS[manualType],
       });
@@ -894,6 +911,32 @@ export default function AddVesselModal({
                   <option value="research-survey">Pesquisa / Hidrográfico (Research Survey Vessel)</option>
                 </select>
               </div>
+
+              {manualType === "container" && (
+                <div className="max-w-xs">
+                  <label className="block text-xs font-bold text-[#2d4b58] mb-1" htmlFor="manual-bay-count">
+                    Quantidade de Bays (até {MAX_BAY_COUNT})
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="manual-bay-count"
+                      type="number"
+                      min="1"
+                      max={MAX_BAY_COUNT}
+                      step="1"
+                      inputMode="numeric"
+                      value={manualBays ?? ""}
+                      onChange={(event) => setManualBays(
+                        event.target.value === "" ? undefined : normalizeBayCount(event.target.value)
+                      )}
+                      placeholder="Ex.: 20"
+                      className="w-full pl-3 pr-12 py-2 text-xs border border-[#cfdce0] rounded-lg focus:outline-none focus:border-[#16869a]"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Bay</span>
+                  </div>
+                  <p className="mt-1 text-[10px] leading-relaxed text-[#71848b]">Ex.: 20 gera 01, 03, 05...21. A numeração deixa um vão no passadiço.</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

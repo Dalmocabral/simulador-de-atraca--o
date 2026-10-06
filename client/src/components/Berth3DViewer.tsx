@@ -4,11 +4,13 @@ import type { Scenario, Vessel } from "@/lib/berth-model";
 import {
   BOLLARD_TYPES,
   DEFAULT_PORTAINERS,
+  bayNumberSequence,
   berthwiseOffsetFromStern,
   bollardDisplayPositions,
   defaultMooringOffset,
   MOORING_LINE_LABELS,
   normalizeMooringOffset,
+  normalizeBayCount,
   normalizeVesselType,
   segmentOffsets,
   totalQuayLength,
@@ -22,7 +24,10 @@ interface Berth3DViewerProps {
 type ThreeModule = typeof import("three");
 type ThreeObject = import("three").Object3D;
 
-const CONTAINER_COLORS = ["#a93b38", "#213d67", "#d7cabb", "#9d472f", "#47604e", "#b08b35", "#68777c"];
+const CONTAINER_COLORS_3D = [
+  "#e24b3b", "#f08222", "#e5ba18", "#2386c8", "#35965b",
+  "#815bb8", "#d5476c", "#17a0a0", "#596c7e",
+] as const;
 const HULL_STATIONS = [
   [0, 0.72], [0.025, 0.83], [0.08, 0.94], [0.16, 0.98], [0.82, 0.98],
   [0.9, 0.93], [0.95, 0.72], [0.98, 0.4], [1, 0.08],
@@ -563,7 +568,9 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
     const tiers = beam >= 40 ? 4 : beam >= 32 ? 3 : 2;
     const topContainerY = deckHeight + 1.38 + tiers * 2.68;
     const towerHeight = isContainer ? Math.max(15.2, topContainerY - deckHeight + 4.2) : 13.5;
-    const houseLength = Math.max(16, Math.min(loa * 0.12, 38));
+    const houseLength = isContainer
+      ? Math.max(8, Math.min(loa * 0.045, 14))
+      : Math.max(16, Math.min(loa * 0.12, 38));
     const houseMaterial = new THREE.MeshStandardMaterial({ color: "#f1f5f9", roughness: 0.62 });
     const funnelColor = isTanker ? "#ea580c" : (VESSEL_COLORS[vessel.color]?.stroke ?? "#285a78");
     const funnelMaterial = new THREE.MeshStandardMaterial({ color: funnelColor, roughness: 0.65 });
@@ -742,17 +749,19 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
       });
       addBox(THREE, group, [2.2, 0.6, 2.2], [0, deckHeight + gantryHeight - 0.4, 0], new THREE.MeshStandardMaterial({ color: "#eab308" }));
     } else if (isContainer) {
-      // Contêineres
-      const columns = Math.max(4, Math.min(20, Math.floor(loa / 16)));
+      const bayCount = normalizeBayCount(vessel.bayCount ?? vessel.bays ?? vessel.maxBayNumber);
+      const baySlots = bayCount ? bayNumberSequence(bayCount).length : 0;
+      const columns = Math.max(1, Math.min(40, baySlots || Math.max(4, Math.floor(loa / 16))));
       const rows = beam >= 28 ? 3 : 2;
       const tiers = beam >= 40 ? 4 : beam >= 32 ? 3 : 2;
-      const columnSpacing = (loa * 0.61) / columns;
-      const lengthPerContainer = Math.max(7.5, Math.min(15, columnSpacing * 0.92));
+      const cargoStartFromStern = loa * 0.03;
+      const cargoLength = loa * 0.9;
+      const columnSpacing = cargoLength / columns;
+      const containerLength = Math.max(3.5, Math.min(12.1, columnSpacing * 0.92));
       const widthPerContainer = Math.max(6, Math.min(10, (beam * 0.72) / rows));
-      const containerLength = lengthPerContainer - 0.45;
       const containerWidth = widthPerContainer - 0.45;
       const containerGeometry = new THREE.BoxGeometry(containerLength, 2.55, containerWidth);
-      const containerMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.88 });
+      const containerMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.78 });
       const instanceCount = columns * rows * tiers;
       const containers = new THREE.InstancedMesh(containerGeometry, containerMaterial, instanceCount);
       const cornerMaterial = new THREE.MeshStandardMaterial({ color: "#8a969b", roughness: 0.74, metalness: 0.16 });
@@ -760,17 +769,25 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
       const pose = new THREE.Object3D();
       let index = 0;
       let cornerIndex = 0;
+      const bridgeStartX = Math.min(sternHouseX - houseLength / 2, bridgeX - bridgeLength / 2) - 0.7;
+      const bridgeEndX = Math.max(sternHouseX + houseLength / 2, bridgeX + bridgeLength / 2) + 0.7;
+
       for (let column = 0; column < columns; column += 1) {
-        const fromStern = loa * 0.23 + (loa * 0.61 * (column + 0.5)) / columns;
+        const fromStern = cargoStartFromStern + columnSpacing * (column + 0.5);
+        const containerX = direction * (fromStern - loa / 2);
+        const containerMinX = containerX - containerLength / 2;
+        const containerMaxX = containerX + containerLength / 2;
+        if (containerMinX < bridgeEndX && containerMaxX > bridgeStartX) continue;
+
         for (let row = 0; row < rows; row += 1) {
           for (let tier = 0; tier < tiers; tier += 1) {
-            const containerX = direction * (fromStern - loa / 2);
             const containerY = deckHeight + 1.38 + tier * 2.68;
             const containerZ = (row - (rows - 1) / 2) * widthPerContainer * 1.05;
             pose.position.set(containerX, containerY, containerZ);
             pose.updateMatrix();
             containers.setMatrixAt(index, pose.matrix);
-            containers.setColorAt(index, new THREE.Color(CONTAINER_COLORS[(column + row * 2 + tier * 3) % CONTAINER_COLORS.length]));
+            containers.setColorAt(index, new THREE.Color(CONTAINER_COLORS_3D[(column + row * 2 + tier * 3) % CONTAINER_COLORS_3D.length]));
+
             for (const xSide of [-1, 1]) {
               for (const zSide of [-1, 1]) {
                 pose.position.set(
@@ -787,6 +804,9 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
           }
         }
       }
+
+      containers.count = index;
+      cornerPosts.count = cornerIndex;
       containers.instanceMatrix.needsUpdate = true;
       if (containers.instanceColor) containers.instanceColor.needsUpdate = true;
       cornerPosts.instanceMatrix.needsUpdate = true;

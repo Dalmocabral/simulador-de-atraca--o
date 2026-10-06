@@ -232,14 +232,19 @@ function vitePluginPraticagemApi(): Plugin {
           req.on("end", () => {
             try {
               const newVessel = JSON.parse(body);
+              if (!newVessel || typeof newVessel.name !== "string" || !newVessel.name.trim()) {
+                throw new Error("Nome do navio obrigatório");
+              }
+              const vesselName = newVessel.name.trim().toUpperCase();
               let list = [];
               if (fs.existsSync(catalogPath)) {
                 try {
                   list = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
                 } catch {}
               }
-              const map = new Map(list.map((v: any) => [v.name.toUpperCase(), v]));
-              map.set(newVessel.name.toUpperCase(), newVessel);
+              const map = new Map<string, any>(list.map((v: any) => [String(v.name ?? "").trim().toUpperCase(), v]));
+              const existing = map.get(vesselName);
+              map.set(vesselName, { ...existing, ...newVessel, name: vesselName });
               const updated = Array.from(map.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
               fs.writeFileSync(catalogPath, JSON.stringify(updated, null, 2), "utf-8");
               res.setHeader("Content-Type", "application/json");

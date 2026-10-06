@@ -61,6 +61,23 @@ export const VESSEL_TYPE_LABELS: Record<VesselType, string> = {
   "research-survey": "Pesquisa / Hidrográfico (Research Survey Vessel)",
 };
 
+export const MAX_BAY_COUNT = 78;
+
+/** Normaliza a quantidade de bays informada pelo operador. */
+export function normalizeBayCount(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Math.min(MAX_BAY_COUNT, Math.max(1, Math.round(parsed)));
+}
+
+export function bayNumberSequence(value: unknown): number[] {
+  const bayCount = normalizeBayCount(value);
+  if (!bayCount) return [];
+  // Ex.: 20 bays -> 01, 03, 05, 07...21; bays ímpares são posições de 20 pés.
+  return Array.from({ length: Math.floor(bayCount / 2) + 1 }, (_, index) => index * 2 + 1);
+}
+
 export const KNOWN_VESSEL_TYPES: Record<string, VesselType> = {
   "OCEAN MERMAID": "research-survey",
   "CMA CGM IRON": "container",
@@ -215,6 +232,12 @@ export interface Vessel {
   mooringLines: MooringLine[];
   color: VesselColor;
   vesselType?: VesselType;
+  /** Quantidade de bays configurada para o convés; omissa quando desconhecida. */
+  bayCount?: number;
+  /** @deprecated Campo legado; cenários antigos são convertidos para bayCount. */
+  maxBayNumber?: number;
+  /** @deprecated Campo legado mantido para compatibilidade. */
+  bays?: number;
 }
 
 export interface Portainer {
@@ -545,6 +568,8 @@ export function normalizeScenario(value: unknown): Scenario | null {
       mooringLines,
       color,
       vesselType,
+      bayCount: normalizeBayCount((raw as any).bayCount ?? (raw as any).maxBayNumber ?? raw.bays),
+      bays: normalizeBayCount((raw as any).bayCount ?? (raw as any).maxBayNumber ?? raw.bays),
     });
   }
 

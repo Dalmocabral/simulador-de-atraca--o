@@ -71,7 +71,10 @@ import {
   DEFAULT_PORTAINERS,
   clampPortainerPosition,
   getPortainerOperationalLimits,
+  MAX_BAY_COUNT,
+  normalizeBayCount,
 } from "@/lib/berth-model";
+import { saveVesselToCatalog } from "@/lib/vessel-catalog";
 
 function metres(value: number) {
   return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value)} m`;
@@ -114,6 +117,7 @@ export default function Simulator() {
   const [isBerth3DModalOpen, setIsBerth3DModalOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const bollardImportRef = useRef<HTMLInputElement>(null);
+  const baySaveTimersRef = useRef<Map<string, number>>(new Map<string, number>());
 
   function patchPortainer(id: string, patch: Partial<Portainer>) {
     setScenario((curr) => {
@@ -207,6 +211,11 @@ export default function Simulator() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => () => {
+    for (const timer of baySaveTimersRef.current.values()) window.clearTimeout(timer);
+    baySaveTimersRef.current.clear();
+  }, []);
+
   function patchScenario(patch: Partial<Scenario>) {
     setScenario((current) => ({ ...current, ...patch }));
   }
@@ -216,6 +225,27 @@ export default function Simulator() {
       ...current,
       vessels: current.vessels.map((vessel) => vessel.id === id ? { ...vessel, ...patch } : vessel),
     }));
+  }
+
+  function scheduleBayCatalogSave(vessel: Vessel, bayCount: number) {
+    const pendingTimer = baySaveTimersRef.current.get(vessel.id);
+    if (pendingTimer !== undefined) window.clearTimeout(pendingTimer);
+
+    const timer = window.setTimeout(() => {
+      baySaveTimersRef.current.delete(vessel.id);
+      void saveVesselToCatalog({
+        name: vessel.name,
+        loa: vessel.loa,
+        beam: vessel.beam,
+        draft: vessel.draft,
+        bayCount,
+        bays: bayCount,
+        berthingSide: vessel.berthingSide,
+        type: VESSEL_TYPE_LABELS[normalizeVesselType(vessel.vesselType, vessel.name)],
+      }).then(() => setNotice(`${vessel.name}: Bay salva automaticamente no catálogo do navio.`));
+    }, 500);
+
+    baySaveTimersRef.current.set(vessel.id, timer);
   }
 
   function patchSegment(id: string, patch: Partial<BerthSegment>) {
@@ -771,7 +801,34 @@ export default function Simulator() {
                     </select>
                   </div>
                 </div>
-                <p className="form-hint">O tipo define a modelagem 3D, convés de carga, manifold e superestrutura.</p>
+                {normalizeVesselType(selectedVessel.vesselType, selectedVessel.name) === "container" && (
+                  <>
+                    <div className="field-row">
+                      <div>
+                        <label className="field-label" htmlFor="vessel-bay-count">Quantidade de Bays</label>
+                        <div className="unit-input">
+                          <input
+                            id="vessel-bay-count"
+                            type="number"
+                            min="1"
+                            max={MAX_BAY_COUNT}
+                            step="1"
+                            inputMode="numeric"
+                            placeholder={`1–${MAX_BAY_COUNT}`}
+                            value={selectedVessel.bayCount ?? selectedVessel.bays ?? selectedVessel.maxBayNumber ?? ""}
+                            onChange={(event) => {
+                              const bayCount = event.target.value === "" ? undefined : normalizeBayCount(event.target.value);
+                              patchVessel(selectedVessel.id, { bayCount, bays: bayCount });
+                              if (bayCount !== undefined) scheduleBayCatalogSave(selectedVessel, bayCount);
+                            }}
+                          />
+                          <span>Bay</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="form-hint">Ex.: 20 gera Bay 01, 03, 05...21. Bay 01 começa na proa; a região do passadiço fica sem numeração. Máximo: {MAX_BAY_COUNT}. O valor é salvo automaticamente no catálogo JSON do navio.</p>
+                  </>
+                )}
 
                 <div className="field-row gangway-field-row">
                   <div>

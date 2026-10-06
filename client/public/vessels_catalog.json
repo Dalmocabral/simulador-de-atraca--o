@@ -9,7 +9,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "MALTA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "05/10/2026 10:50"
+    "updatedAt": "06/10/2026 09:18"
   },
   {
     "name": "CMA CGM PUCCINI",
@@ -27,13 +27,15 @@
     "name": "COSCO SHIPPING ARGENTINA",
     "loa": 335.95,
     "beam": 51.04,
-    "draft": 13,
-    "berthingSide": "bombordo",
+    "draft": 14.3,
+    "berthingSide": "boreste",
     "imo": "9945849",
-    "type": "CONTAINER SHIP",
+    "type": "Porta-Contêineres (Container Ship - Fully Cellular)",
     "flag": "HONG KONG, CHINA",
-    "lastBerth": "TECONTPROLONG",
-    "updatedAt": "05/10/2026 08:22"
+    "lastBerth": "TECONT1",
+    "updatedAt": "06/10/2026 09:13",
+    "bayCount": 50,
+    "bays": 50
   },
   {
     "name": "COSCO SHIPPING BRAZIL",
@@ -63,13 +65,15 @@
     "name": "EVER FAR",
     "loa": 333.9,
     "beam": 48.43,
-    "draft": 12.6,
+    "draft": 14.7,
     "berthingSide": "boreste",
     "imo": "9850862",
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "05/10/2026 10:50"
+    "updatedAt": "06/10/2026 09:18",
+    "bayCount": 76,
+    "bays": 76
   },
   {
     "name": "EVER FASHION",
@@ -84,6 +88,17 @@
     "updatedAt": "2026-10-01"
   },
   {
+    "name": "EVER FIT",
+    "loa": 333.9,
+    "beam": 48.43,
+    "draft": 14.4,
+    "berthingSide": "boreste",
+    "imo": "9850795",
+    "type": "CONTAINER SHIP (FULLY CELLULAR)",
+    "lastBerth": "TECONTPROLONG",
+    "updatedAt": "06/10/2026 09:18"
+  },
+  {
     "name": "EVER LEADER",
     "loa": 334.98,
     "beam": 45.83,
@@ -93,7 +108,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "SINGAPORE",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "05/10/2026 10:50"
+    "updatedAt": "06/10/2026 09:18"
   },
   {
     "name": "KOTA PAHLAWAN",
@@ -105,7 +120,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "SINGAPORE",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "05/10/2026 10:50"
+    "updatedAt": "06/10/2026 09:18"
   },
   {
     "name": "LOG-IN PANTANAL",
@@ -130,6 +145,17 @@
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
     "updatedAt": "2026-10-01 22:32"
+  },
+  {
+    "name": "MAERSK FORTALEZA",
+    "loa": 254.9,
+    "beam": 40,
+    "draft": 10.5,
+    "bayCount": 58,
+    "bays": 58,
+    "berthingSide": "boreste",
+    "type": "Porta-Contêineres (Container Ship - Fully Cellular)",
+    "updatedAt": "06/10/2026 09:21"
   },
   {
     "name": "MALIAKOS",
@@ -165,7 +191,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "BRAZIL",
     "lastBerth": "TECONT1",
-    "updatedAt": "05/10/2026 10:50"
+    "updatedAt": "06/10/2026 09:18"
   },
   {
     "name": "OCEAN MERMAID",
