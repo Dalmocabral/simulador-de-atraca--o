@@ -265,7 +265,7 @@ export interface PortainerLimit {
   maxLabel?: string;
 }
 
-/** Retorna os limites operacionais de deslocamento dos portêineres (P5 não passa de 297-296; P6 não passa de 291-290). */
+/** Retorna os limites operacionais de deslocamento dos portêineres (P5 não passa de 297-296; P6 não passa de 291-290; P4 não passa de 279). */
 export function getPortainerOperationalLimits(bollards: Bollard[]): Record<string, PortainerLimit> {
   const b297 = bollards.find((b) => b.id === "297")?.position ?? 276.9;
   const b296 = bollards.find((b) => b.id === "296")?.position ?? 306.9;
@@ -274,6 +274,8 @@ export function getPortainerOperationalLimits(bollards: Bollard[]): Record<strin
   const b291 = bollards.find((b) => b.id === "291")?.position ?? 443.9;
   const b290 = bollards.find((b) => b.id === "290")?.position ?? 473.9;
   const p6Max = Number(((b291 + b290) / 2).toFixed(1)); // Ponto médio entre 291 e 290
+
+  const b279 = bollards.find((b) => b.id === "279")?.position ?? 771.4;
 
   return {
     P5: {
@@ -284,29 +286,100 @@ export function getPortainerOperationalLimits(bollards: Bollard[]): Record<strin
       max: p6Max,
       maxLabel: `Cabeços 291–290 (${p6Max.toFixed(1).replace(".", ",")} m)`,
     },
+    P4: {
+      max: b279,
+      maxLabel: `Cabeço 279 (${b279.toFixed(1).replace(".", ",")} m)`,
+    },
   };
 }
 
-/** Aplica a trava de limite do portêiner: se tentar passar do cabeço 297-296 (P5) ou 291-290 (P6), trava e retorna o aviso. */
+/** Ordem física fixa dos portêineres ao longo do cais (do início para o fim: P7 < P6 < P9 < P8 < P5 < P4). */
+export const PORTAINER_TRACK_ORDER = ["P7", "P6", "P9", "P8", "P5", "P4"] as const;
+
+/** Distância mínima segura de centro a centro entre portêineres adjacentes (largura física dos pórticos com amortecedores). */
+export const PORTAINER_MIN_SPACING = 27;
+
+/** Aplica a trava de limite do portêiner:
+ * 1. Não permite passar dos limites operacionais de trecho (P5, P6, P4).
+ * 2. Bloqueia a passagem física sobre outros portêineres parados nos mesmos trilhos (distância mínima de 27 m).
+ */
 export function clampPortainerPosition(
   id: string,
   rawPosition: number,
   bollards: Bollard[],
-  totalQuay: number
+  totalQuay: number,
+  portainers?: Array<{ id: string; position: number; name?: string; enabled?: boolean }>,
 ): { position: number; hitLimit: boolean; message?: string } {
   const limits = getPortainerOperationalLimits(bollards)[id];
   let position = Math.max(0, Math.min(totalQuay, rawPosition));
   let hitLimit = false;
   let message: string | undefined;
 
+  // 1. Limites operacionais de cais
   if (limits?.min !== undefined && position < limits.min) {
     position = limits.min;
     hitLimit = true;
-    message = `Limite do Portêiner ${id}: o ${id} não pode passar do ponto médio entre os cabeços 297 e 296 (estação ${limits.min.toFixed(1).replace(".", ",")} m).`;
+    message = limits.minLabel
+      ? `Limite do Portêiner ${id}: o ${id} não pode passar de ${limits.minLabel}.`
+      : `Limite do Portêiner ${id}: estação mínima ${limits.min.toFixed(1).replace(".", ",")} m.`;
   } else if (limits?.max !== undefined && position > limits.max) {
     position = limits.max;
     hitLimit = true;
-    message = `Limite do Portêiner ${id}: o ${id} não pode passar do ponto médio entre os cabeços 291 e 290 (estação ${limits.max.toFixed(1).replace(".", ",")} m).`;
+    message = limits.maxLabel
+      ? `Limite do Portêiner ${id}: o ${id} não pode passar de ${limits.maxLabel}.`
+      : `Limite do Portêiner ${id}: estação máxima ${limits.max.toFixed(1).replace(".", ",")} m.`;
+  }
+
+  // 2. Bloqueio físico de trilho entre portêineres (um não pode atravessar o outro)
+  if (portainers && portainers.length > 1) {
+    const current = portainers.find((p) => p.id === id);
+    const currPos = current ? current.position : position;
+    const currentName = current?.name || id;
+    const myOrderIndex = PORTAINER_TRACK_ORDER.indexOf(id as (typeof PORTAINER_TRACK_ORDER)[number]);
+
+    let leftBlocker: { id: string; position: number; name?: string } | null = null;
+    let rightBlocker: { id: string; position: number; name?: string } | null = null;
+    let maxLeftLimit = -Infinity;
+    let minRightLimit = Infinity;
+
+    for (const other of portainers) {
+      if (other.id === id) continue;
+
+      let isLeft = false;
+      const otherOrderIndex = PORTAINER_TRACK_ORDER.indexOf(other.id as (typeof PORTAINER_TRACK_ORDER)[number]);
+
+      if (myOrderIndex !== -1 && otherOrderIndex !== -1) {
+        isLeft = otherOrderIndex < myOrderIndex;
+      } else {
+        isLeft = other.position < currPos;
+      }
+
+      if (isLeft) {
+        const limit = other.position + PORTAINER_MIN_SPACING;
+        if (limit > maxLeftLimit) {
+          maxLeftLimit = limit;
+          leftBlocker = other;
+        }
+      } else {
+        const limit = other.position - PORTAINER_MIN_SPACING;
+        if (limit < minRightLimit) {
+          minRightLimit = limit;
+          rightBlocker = other;
+        }
+      }
+    }
+
+    if (leftBlocker && position < maxLeftLimit) {
+      position = maxLeftLimit;
+      hitLimit = true;
+      const bName = leftBlocker.name || leftBlocker.id;
+      message = `Bloqueio nos trilhos: o Portêiner ${currentName} não pode atravessar o Portêiner ${bName} (distância mínima: ${PORTAINER_MIN_SPACING} m).`;
+    } else if (rightBlocker && position > minRightLimit) {
+      position = minRightLimit;
+      hitLimit = true;
+      const bName = rightBlocker.name || rightBlocker.id;
+      message = `Bloqueio nos trilhos: o Portêiner ${currentName} não pode atravessar o Portêiner ${bName} (distância mínima: ${PORTAINER_MIN_SPACING} m).`;
+    }
   }
 
   return { position: Number(position.toFixed(1)), hitLimit, message };

@@ -128,7 +128,7 @@ export default function Simulator() {
           if (p.id !== id) return p;
           let nextPos = patch.position !== undefined ? patch.position : p.position;
           if (patch.position !== undefined) {
-            const clamped = clampPortainerPosition(id, nextPos, curr.bollards, total);
+            const clamped = clampPortainerPosition(id, nextPos, curr.bollards, total, list);
             nextPos = clamped.position;
             if (clamped.hitLimit && clamped.message) {
               setNotice(clamped.message);

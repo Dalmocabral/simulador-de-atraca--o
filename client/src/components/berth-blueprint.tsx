@@ -1153,18 +1153,30 @@ export default function BerthBlueprint({
   const operationalLimits = getPortainerOperationalLimits(scenario.bollards);
   const p5LimitM = operationalLimits.P5?.min;
   const p6LimitM = operationalLimits.P6?.max;
+  const p4LimitM = operationalLimits.P4?.max;
   const p5LimitX = p5LimitM !== undefined ? trackStart + p5LimitM * scale : null;
   const p6LimitX = p6LimitM !== undefined ? trackStart + p6LimitM * scale : null;
+  const p4LimitX = p4LimitM !== undefined ? trackStart + p4LimitM * scale : null;
 
   const portainersList = scenario.portainers ?? DEFAULT_PORTAINERS;
   const p5Portainer = portainersList.find((p) => p.id === "P5");
   const p6Portainer = portainersList.find((p) => p.id === "P6");
+  const p4Portainer = portainersList.find((p) => p.id === "P4");
   const isP5Active = (isPresentationMode || scenario.showPortainers !== false) && (p5Portainer ? (isPresentationMode || p5Portainer.enabled) : true);
   const isP6Active = (isPresentationMode || scenario.showPortainers !== false) && (p6Portainer ? (isPresentationMode || p6Portainer.enabled) : true);
+  const isP4Active = (isPresentationMode || scenario.showPortainers !== false) && (p4Portainer ? (isPresentationMode || p4Portainer.enabled) : true);
 
   const b297 = scenario.bollards.find((b) => b.id === "297")?.position ?? 276.9;
   const b296 = scenario.bollards.find((b) => b.id === "296")?.position ?? 306.9;
   const b294 = scenario.bollards.find((b) => b.id === "294")?.position ?? 362.9;
+
+  const b279 = scenario.bollards.find((b) => b.id === "279")?.position ?? 771.4;
+  const b278 = scenario.bollards.find((b) => b.id === "278")?.position ?? 796.9;
+  const b277 = scenario.bollards.find((b) => b.id === "277")?.position ?? 823.4;
+
+  // Cerca divisória entre empresas (entre cabeço 278 e 277)
+  const fenceM = (b278 + b277) / 2; // ~810.15m
+  const fenceX = trackStart + fenceM * scale;
 
   const manifold297_296_M = (b297 + b296) / 2; // ~291.9m
   const manifold297_296_X = trackStart + manifold297_296_M * scale;
@@ -1253,7 +1265,8 @@ export default function BerthBlueprint({
       onMoveVessel(drag.id, Math.round(next * 10) / 10);
     } else if (drag.kind === "portainer") {
       const rawNext = positionAt(event.clientX) - drag.grabOffset;
-      const clamped = clampPortainerPosition(drag.id, rawNext, scenario.bollards, total);
+      const portainersList = scenario.portainers ?? DEFAULT_PORTAINERS;
+      const clamped = clampPortainerPosition(drag.id, rawNext, scenario.bollards, total, portainersList);
       onMovePortainer?.(drag.id, clamped.position);
       if (clamped.hitLimit && clamped.message) {
         onPortainerLimitHit?.(clamped.message);
@@ -1311,6 +1324,16 @@ export default function BerthBlueprint({
           </pattern>
         </defs>
         <rect x="0" y="0" width={width} height={HEIGHT} fill="#f8fbfc" />
+        {/* Faixa sombreada da empresa vizinha além da cerca divisória */}
+        <rect
+          x={fenceX}
+          y="0"
+          width={Math.max(0, width - fenceX)}
+          height={HEIGHT}
+          fill="#64748b"
+          opacity="0.14"
+          pointerEvents="none"
+        />
         <rect x={trackStart} y="32" width={total * scale} height={QUAY_Y - 32} fill="#eef7f8" />
         <rect x={trackStart} y="32" width={total * scale} height={QUAY_Y - 32} fill="url(#water-grid)" />
 
@@ -1526,6 +1549,16 @@ export default function BerthBlueprint({
 
         <rect x={trackStart} y={QUAY_Y} width={total * scale} height="60" fill="#8d9da3" />
         <rect x={trackStart} y={QUAY_Y} width={total * scale} height="4" fill="#637b84" />
+        {/* Área sombreada do cais além da cerca divisória */}
+        <rect
+          x={fenceX}
+          y={QUAY_Y}
+          width={Math.max(0, trackEnd - fenceX)}
+          height="60"
+          fill="#475569"
+          opacity="0.18"
+          pointerEvents="none"
+        />
 
         {/* Trilhos dos Portêineres STS (Trilho Marítimo e Terrestre) */}
         <g className="crane-rails" opacity={!isPresentationMode && scenario.showPortainers === false ? 0.35 : 1}>
@@ -1533,6 +1566,54 @@ export default function BerthBlueprint({
           <line x1={trackStart} y1="242" x2={trackEnd} y2="242" stroke="#cbd5e1" strokeWidth="0.8" strokeDasharray="16 4" />
           <line x1={trackStart} y1="272" x2={trackEnd} y2="272" stroke="#475569" strokeWidth="2.4" />
           <line x1={trackStart} y1="272" x2={trackEnd} y2="272" stroke="#cbd5e1" strokeWidth="0.8" strokeDasharray="16 4" />
+        </g>
+
+        {/* Cerca divisória entre empresas (entre cabeço 278 e 277) */}
+        <g className="fence-boundary-layer" pointerEvents="none">
+          <title>{`Divisão de concessão entre empresas · Cerca entre Cabeços 278 e 277 (estação ${fenceM.toFixed(1).replace(".", ",")} m)`}</title>
+          {/* Linha vertical tracejada da cerca */}
+          <line
+            x1={fenceX}
+            y1="175"
+            x2={fenceX}
+            y2="278"
+            stroke="#991b1b"
+            strokeWidth="1.8"
+            strokeDasharray="5 3"
+          />
+          {/* Ramificação tracejada em L conectando ao badge da cerca */}
+          <path
+            d={`M ${fenceX} 278 L ${fenceX + 11} 278 L ${fenceX + 11} 283`}
+            fill="none"
+            stroke="#991b1b"
+            strokeWidth="1.8"
+            strokeDasharray="4 2.5"
+          />
+          {/* Badge vermelho "Cerca" */}
+          <rect
+            x={fenceX + 1}
+            y="283"
+            width="36"
+            height="13"
+            rx="2"
+            fill="#991b1b"
+            stroke="#7f1d1d"
+            strokeWidth="0.8"
+          />
+          <text
+            x={fenceX + 19}
+            y="291.8"
+            textAnchor="middle"
+            dominantBaseline="central"
+            style={{
+              fill: "#ffffff",
+              fontSize: "6.2px",
+              fontWeight: 900,
+              letterSpacing: "0.2px",
+            }}
+          >
+            Cerca
+          </text>
         </g>
 
         {/* Marcadores visuais dos Limites Operacionais (aparecem com opacidade leve somente no simulador quando ativo) */}
@@ -1613,6 +1694,46 @@ export default function BerthBlueprint({
                     style={{ fill: "#ffffff", fontSize: "5.2px", fontWeight: 800, letterSpacing: "0.2px" }}
                   >
                     LIM P6 (291–290) ▶
+                  </text>
+                </g>
+              );
+            })()}
+
+            {/* Limite P4 (Cabeço 279) - visível se P4 estiver ativo */}
+            {isP4Active && p4LimitX !== null && p4LimitM !== undefined && (() => {
+              const isHighlighted = hoveredPortainerId === "P4" || (dragRef.current?.kind === "portainer" && dragRef.current.id === "P4");
+              return (
+                <g opacity={isHighlighted ? 1 : 0.88} style={{ transition: "opacity 0.2s ease" }}>
+                  <title>{`Limite Operacional Portêiner P04 / P4 · Cabeço 279 (estação ${p4LimitM.toFixed(1).replace(".", ",")} m)`}</title>
+                  {/* Linha vertical descendo do Cabeço 279 até o marcador */}
+                  <line
+                    x1={p4LimitX}
+                    y1={214}
+                    x2={p4LimitX}
+                    y2={308}
+                    stroke="#78350f"
+                    strokeWidth={isHighlighted ? "1.8" : "1.4"}
+                    strokeDasharray="4 3"
+                  />
+                  {/* Seta apontando para a esquerda (P04) com base alinhada ao Cabeço 279 */}
+                  <path
+                    d={`M ${p4LimitX} 295 L ${p4LimitX - 21} 295 L ${p4LimitX - 28} 301.5 L ${p4LimitX - 21} 308 L ${p4LimitX} 308 Z`}
+                    fill="#78350f"
+                    stroke="#451a03"
+                    strokeWidth="0.8"
+                  />
+                  <text
+                    x={p4LimitX - 11}
+                    y={303.6}
+                    textAnchor="middle"
+                    style={{
+                      fill: "#ffffff",
+                      fontSize: "6px",
+                      fontWeight: 900,
+                      letterSpacing: "0.3px",
+                    }}
+                  >
+                    P04
                   </text>
                 </g>
               );

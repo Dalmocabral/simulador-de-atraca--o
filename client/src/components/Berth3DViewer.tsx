@@ -201,11 +201,6 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
   const hull = new THREE.Mesh(createHullGeometry(THREE, direction, loa, beam, draft, deckHeight), hullMaterial);
   group.add(hull);
 
-  // Faixa/friso branco de amurada ao longo do convés no navio tanque (como na foto de referência)
-  if (isTanker) {
-    addBox(THREE, group, [loa * 0.96, 0.45, beam * 1.01], [0, deckHeight + 0.12, 0], new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.5 }));
-  }
-
   // Fundo submerso vermelho antifouling para embarcações offshore e de pesquisa
   if (isOffshore || isResearch) {
     addBox(THREE, group, [loa * 0.86, draft * 0.85, beam * 0.88], [0, -draft * 0.55, 0], new THREE.MeshStandardMaterial({ color: "#7f1d1d", roughness: 0.8 }));
@@ -644,20 +639,52 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
       group.add(pipe);
     });
 
-    // Castelo de Proa Elevado exclusivo para navios tanque (Forecastle)
+    // Equipamentos náuticos da Proa / Castelo para navios tanque (sem caixas/tampão sobressalente)
     if (isTanker) {
-      const bowX = direction * (loa * 0.43);
-      const forecastleLen = loa * 0.13;
-      addBox(THREE, group, [forecastleLen, 1.9, beam * 0.78], [bowX, deckHeight + 0.95, 0], new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.7 }));
-      addBox(THREE, group, [forecastleLen * 0.9, 1.4, beam * 0.82], [bowX, deckHeight + 2.15, 0], new THREE.MeshStandardMaterial({ color: "#ffffff" }));
-      [-beam * 0.22, beam * 0.22].forEach((wz) => {
-        const winch = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.5, 8), darkDetailMaterial);
-        winch.position.set(bowX - direction * 1.5, deckHeight + 2.3, wz);
-        group.add(winch);
+      // 1. Quebra-mar em V clássico (Wave deflector / Breakwater) protegendo o convés de carga
+      const bwX = direction * (loa * 0.365);
+      const bwWingLength = beam * 0.38;
+      const bwMat = new THREE.MeshStandardMaterial({ color: "#f8fafc", roughness: 0.6 });
+      for (const side of [-1, 1]) {
+        const wing = addBox(THREE, group, [loa * 0.032, 1.35, bwWingLength], [bwX, deckHeight + 0.68, side * (bwWingLength * 0.32)], bwMat);
+        wing.rotation.y = direction * side * 0.46;
+      }
+      // Reforço central do quebra-mar
+      addBox(THREE, group, [0.35, 1.35, 0.35], [bwX + direction * (loa * 0.012), deckHeight + 0.68, 0], bwMat);
+
+      // 2. Guinchos de amarração e molinetes de âncora instalados diretamente sobre o convés afunilado da proa
+      const winchX = direction * (loa * 0.425);
+      [-beam * 0.14, beam * 0.14].forEach((wz) => {
+        // Base / pedestal do guincho
+        addBox(THREE, group, [2.2, 0.45, 1.6], [winchX, deckHeight + 0.23, wz], darkDetailMaterial);
+        // Tambor de cabos
+        const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 10), darkDetailMaterial);
+        drum.rotation.z = Math.PI / 2;
+        drum.position.set(winchX, deckHeight + 0.85, wz);
+        group.add(drum);
+        // Molinete de corrente / barbotim
+        const wildcat = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.35, 8), darkDetailMaterial);
+        wildcat.rotation.z = Math.PI / 2;
+        wildcat.position.set(winchX + direction * 0.7, deckHeight + 0.85, wz);
+        group.add(wildcat);
       });
-      const fwdMast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 5.8, 8), new THREE.MeshStandardMaterial({ color: "#ffffff" }));
-      fwdMast.position.set(direction * (loa * 0.485), deckHeight + 4.4, 0);
+
+      // 3. Buzinas de amarração / cabeços duplos de proa
+      [-beam * 0.18, beam * 0.18].forEach((bz) => {
+        const bitt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.9, 8), darkDetailMaterial);
+        bitt.position.set(direction * (loa * 0.45), deckHeight + 0.45, bz);
+        group.add(bitt);
+      });
+
+      // 4. Mastro de vante (Foremast / Jackstaff com farolete de navegação no bico da proa)
+      const fwdMast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 5.8, 8), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.5 }));
+      fwdMast.position.set(direction * (loa * 0.485), deckHeight + 2.9, 0);
       group.add(fwdMast);
+
+      // Farolete de proa
+      const navLight = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.35, 8), new THREE.MeshStandardMaterial({ color: "#facc15", roughness: 0.2 }));
+      navLight.position.set(direction * (loa * 0.485), deckHeight + 5.8, 0);
+      group.add(navLight);
     }
 
     // Bulbo de Proa submerso
@@ -752,20 +779,26 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
       const bayCount = normalizeBayCount(vessel.bayCount ?? vessel.bays ?? vessel.maxBayNumber);
       const baySlots = bayCount ? bayNumberSequence(bayCount).length : 0;
       const columns = Math.max(1, Math.min(40, baySlots || Math.max(4, Math.floor(loa / 16))));
-      const rows = beam >= 28 ? 3 : 2;
+      // Fileiras transversais (boca) modeladas na proporção real de contêineres marítimos (~2.44m de largura ISO)
+      const usableBeam = beam * 0.82;
+      const rows = Math.max(4, Math.min(16, Math.round(usableBeam / 2.7)));
+      const rowSpacing = usableBeam / rows;
+      const containerWidth = Math.max(2.1, rowSpacing - 0.28);
       const tiers = beam >= 40 ? 4 : beam >= 32 ? 3 : 2;
+
       const cargoStartFromStern = loa * 0.03;
       const cargoLength = loa * 0.9;
       const columnSpacing = cargoLength / columns;
-      const containerLength = Math.max(3.5, Math.min(12.1, columnSpacing * 0.92));
-      const widthPerContainer = Math.max(6, Math.min(10, (beam * 0.72) / rows));
-      const containerWidth = widthPerContainer - 0.45;
-      const containerGeometry = new THREE.BoxGeometry(containerLength, 2.55, containerWidth);
+      // Comprimento longitudinal proporcional ao slot (formato retangular nítido de contêiner 20'/40' pés)
+      const containerLength = Math.max(5.8, Math.min(12.2, columnSpacing * 0.92));
+      const containerHeight = 2.55;
+
+      const containerGeometry = new THREE.BoxGeometry(containerLength, containerHeight, containerWidth);
       const containerMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.78 });
       const instanceCount = columns * rows * tiers;
       const containers = new THREE.InstancedMesh(containerGeometry, containerMaterial, instanceCount);
       const cornerMaterial = new THREE.MeshStandardMaterial({ color: "#8a969b", roughness: 0.74, metalness: 0.16 });
-      const cornerPosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 2.48, 0.26), cornerMaterial, instanceCount * 4);
+      const cornerPosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.24, 2.48, 0.24), cornerMaterial, instanceCount * 4);
       const pose = new THREE.Object3D();
       let index = 0;
       let cornerIndex = 0;
@@ -782,7 +815,7 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
         for (let row = 0; row < rows; row += 1) {
           for (let tier = 0; tier < tiers; tier += 1) {
             const containerY = deckHeight + 1.38 + tier * 2.68;
-            const containerZ = (row - (rows - 1) / 2) * widthPerContainer * 1.05;
+            const containerZ = (row - (rows - 1) / 2) * rowSpacing;
             pose.position.set(containerX, containerY, containerZ);
             pose.updateMatrix();
             containers.setMatrixAt(index, pose.matrix);
@@ -791,9 +824,9 @@ function addVessel(THREE: ThreeModule, scene: import("three").Scene, vessel: Ves
             for (const xSide of [-1, 1]) {
               for (const zSide of [-1, 1]) {
                 pose.position.set(
-                  containerX + (xSide * (containerLength - 0.3)) / 2,
+                  containerX + (xSide * (containerLength - 0.26)) / 2,
                   containerY,
-                  containerZ + (zSide * (containerWidth - 0.3)) / 2,
+                  containerZ + (zSide * (containerWidth - 0.26)) / 2,
                 );
                 pose.updateMatrix();
                 cornerPosts.setMatrixAt(cornerIndex, pose.matrix);
@@ -1270,6 +1303,263 @@ function addShoreManifolds(THREE: ThreeModule, scene: import("three").Scene, sce
   }
 }
 
+function addCompanyBoundaryFence(
+  THREE: ThreeModule,
+  scene: import("three").Scene,
+  scenario: Scenario,
+  total: number,
+) {
+  const b278 = scenario.bollards.find((b) => b.id === "278")?.position ?? 796.9;
+  const b277 = scenario.bollards.find((b) => b.id === "277")?.position ?? 823.4;
+  const fenceM = (b278 + b277) / 2; // ~810.15 m (ponto médio exato entre cabeços 278 e 277)
+  const fenceX = stationToX(fenceM, total);
+
+  const group = new THREE.Group();
+  group.position.x = fenceX;
+
+  // 1. Piso acinzentado diferenciado da empresa vizinha (estação > fenceM até o fim do cais)
+  const neighborQuayLength = Math.max(0, total - fenceM);
+  if (neighborQuayLength > 0.5) {
+    const neighborCenterX = stationToX(fenceM + neighborQuayLength / 2, total);
+    const neighborMat = new THREE.MeshStandardMaterial({
+      color: "#5a6870",
+      roughness: 0.92,
+      metalness: 0.05,
+      transparent: true,
+      opacity: 0.44,
+      depthWrite: false,
+    });
+    const neighborDeck = new THREE.Mesh(
+      new THREE.PlaneGeometry(neighborQuayLength, 30),
+      neighborMat,
+    );
+    neighborDeck.rotation.x = -Math.PI / 2;
+    neighborDeck.position.set(neighborCenterX, QUAY_TOP_Y + 0.015, -15);
+    scene.add(neighborDeck);
+  }
+
+  // 2. Faixa zebrada amarela e preta / demarcação de segurança no solo ao longo da divisa
+  const stripeCanvas = document.createElement("canvas");
+  stripeCanvas.width = 128;
+  stripeCanvas.height = 128;
+  const sCtx = stripeCanvas.getContext("2d");
+  if (sCtx) {
+    sCtx.fillStyle = "#eab308"; // Amarelo de segurança
+    sCtx.fillRect(0, 0, 128, 128);
+    sCtx.fillStyle = "#1e293b"; // Listras pretas diagonais
+    for (let i = -128; i < 256; i += 32) {
+      sCtx.beginPath();
+      sCtx.moveTo(i, 0);
+      sCtx.lineTo(i + 16, 0);
+      sCtx.lineTo(i + 16 + 128, 128);
+      sCtx.lineTo(i + 128, 128);
+      sCtx.closePath();
+      sCtx.fill();
+    }
+  }
+  const stripeTex = new THREE.CanvasTexture(stripeCanvas);
+  stripeTex.wrapS = THREE.RepeatWrapping;
+  stripeTex.wrapT = THREE.RepeatWrapping;
+  stripeTex.repeat.set(1, 14);
+  const stripeMat = new THREE.MeshStandardMaterial({
+    map: stripeTex,
+    roughness: 0.8,
+    side: THREE.DoubleSide,
+  });
+  const groundStripe = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 29.2), stripeMat);
+  groundStripe.rotation.x = -Math.PI / 2;
+  groundStripe.position.set(0, QUAY_TOP_Y + 0.02, -15);
+  group.add(groundStripe);
+
+  // 3. Materiais estruturais da cerca
+  const steelPostMat = new THREE.MeshStandardMaterial({
+    color: "#334155",
+    roughness: 0.35,
+    metalness: 0.75,
+  });
+  const railMat = new THREE.MeshStandardMaterial({
+    color: "#475569",
+    roughness: 0.45,
+    metalness: 0.65,
+  });
+  const concreteBaseMat = new THREE.MeshStandardMaterial({
+    color: "#cbd5e1",
+    roughness: 0.9,
+  });
+
+  // Textura do alambrado / malha losangular semi-transparente
+  const meshCanvas = document.createElement("canvas");
+  meshCanvas.width = 64;
+  meshCanvas.height = 64;
+  const mCtx = meshCanvas.getContext("2d");
+  if (mCtx) {
+    mCtx.clearRect(0, 0, 64, 64);
+    mCtx.strokeStyle = "#94a3b8";
+    mCtx.lineWidth = 3.5;
+    mCtx.beginPath();
+    mCtx.moveTo(32, 0); mCtx.lineTo(64, 32); mCtx.lineTo(32, 64); mCtx.lineTo(0, 32); mCtx.closePath();
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(0, 0); mCtx.lineTo(32, 32); mCtx.lineTo(64, 0);
+    mCtx.moveTo(0, 64); mCtx.lineTo(32, 32); mCtx.lineTo(64, 64);
+    mCtx.stroke();
+  }
+  const meshTex = new THREE.CanvasTexture(meshCanvas);
+  meshTex.wrapS = THREE.RepeatWrapping;
+  meshTex.wrapT = THREE.RepeatWrapping;
+  meshTex.repeat.set(24, 4);
+  const fenceMeshMat = new THREE.MeshStandardMaterial({
+    map: meshTex,
+    transparent: true,
+    opacity: 0.82,
+    roughness: 0.5,
+    metalness: 0.6,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  // Painel de tela contínuo da cerca (altura 2.4m, de z = -0.5 até z = -29.5)
+  const fenceLength = 29.0;
+  const fenceCenterZ = -15.0;
+  const fenceHeight = 2.4;
+  const fenceMeshPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(fenceLength, fenceHeight),
+    fenceMeshMat,
+  );
+  fenceMeshPlane.rotation.y = Math.PI / 2;
+  fenceMeshPlane.position.set(0, QUAY_TOP_Y + fenceHeight / 2 + 0.15, fenceCenterZ);
+  group.add(fenceMeshPlane);
+
+  // 4. Postes verticais espaçados ao longo do cais
+  const postSpacing = 2.4;
+  const postCount = Math.floor(fenceLength / postSpacing) + 1;
+  const startZ = -0.5;
+
+  for (let i = 0; i < postCount; i += 1) {
+    const postZ = startZ - i * postSpacing;
+    if (postZ < -29.6) continue;
+
+    // Sapata / base de concreto no piso
+    addBox(THREE, group, [0.36, 0.22, 0.36], [0, QUAY_TOP_Y + 0.11, postZ], concreteBaseMat);
+
+    // Pilar metálico vertical (2.65m de altura)
+    const postGeo = new THREE.CylinderGeometry(0.065, 0.065, 2.65, 8);
+    const postMesh = new THREE.Mesh(postGeo, steelPostMat);
+    postMesh.position.set(0, QUAY_TOP_Y + 1.35, postZ);
+    group.add(postMesh);
+
+    // Braço inclinado superior a 45° (suporte da concertina de segurança)
+    const armGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.55, 6);
+    const armMesh = new THREE.Mesh(armGeo, steelPostMat);
+    armMesh.rotation.z = Math.PI / 4;
+    armMesh.position.set(-0.18, QUAY_TOP_Y + 2.8, postZ);
+    group.add(armMesh);
+  }
+
+  // 5. Trilhos horizontais de reforço (superior, intermediário e inferior)
+  for (const railY of [QUAY_TOP_Y + 0.18, QUAY_TOP_Y + 1.35, QUAY_TOP_Y + 2.55]) {
+    const railGeo = new THREE.CylinderGeometry(0.04, 0.04, fenceLength, 8);
+    const railMesh = new THREE.Mesh(railGeo, railMat);
+    railMesh.rotation.x = Math.PI / 2;
+    railMesh.position.set(0, railY, fenceCenterZ);
+    group.add(railMesh);
+  }
+
+  // 6. Concertina / arame farpado no topo dos braços inclinados
+  const razorWireMat = new THREE.MeshStandardMaterial({
+    color: "#94a3b8",
+    roughness: 0.3,
+    metalness: 0.85,
+  });
+  const razorLineGeo = new THREE.CylinderGeometry(0.025, 0.025, fenceLength, 6);
+  const razorLine = new THREE.Mesh(razorLineGeo, razorWireMat);
+  razorLine.rotation.x = Math.PI / 2;
+  razorLine.position.set(-0.35, QUAY_TOP_Y + 2.95, fenceCenterZ);
+  group.add(razorLine);
+
+  for (let cz = startZ; cz >= -29.5; cz -= 0.75) {
+    const ringGeo = new THREE.TorusGeometry(0.24, 0.018, 6, 12);
+    const ringMesh = new THREE.Mesh(ringGeo, razorWireMat);
+    ringMesh.rotation.y = Math.PI / 2;
+    ringMesh.position.set(-0.35, QUAY_TOP_Y + 2.95, cz);
+    group.add(ringMesh);
+  }
+
+  // 7. Placas físicas montadas na grade (altura dos olhos, legíveis em ambos os lados)
+  for (const signZ of [-6.0, -18.0]) {
+    const signCanvas = document.createElement("canvas");
+    signCanvas.width = 256;
+    signCanvas.height = 72;
+    const sCtx2 = signCanvas.getContext("2d");
+    if (sCtx2) {
+      sCtx2.fillStyle = "#991b1b"; // Vermelho institucional da Cerca
+      sCtx2.fillRect(2, 2, 252, 68);
+      sCtx2.strokeStyle = "#ffffff";
+      sCtx2.lineWidth = 4;
+      sCtx2.strokeRect(5, 5, 246, 62);
+      sCtx2.fillStyle = "#ffffff";
+      sCtx2.font = "bold 20px Arial, sans-serif";
+      sCtx2.textAlign = "center";
+      sCtx2.textBaseline = "middle";
+      sCtx2.fillText("CERCA · DIVISA ENTRE EMPRESAS", 128, 26, 240);
+      sCtx2.font = "bold 13px Arial, sans-serif";
+      sCtx2.fillStyle = "#fecaca";
+      sCtx2.fillText("LIMITE DE CONCESSÃO (CAB. 278 – 277)", 128, 50, 240);
+    }
+    const signTex = new THREE.CanvasTexture(signCanvas);
+    signTex.colorSpace = THREE.SRGBColorSpace;
+    const signMat = new THREE.MeshStandardMaterial({
+      map: signTex,
+      roughness: 0.4,
+      side: THREE.DoubleSide,
+    });
+    const signBoard = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.75), signMat);
+    signBoard.rotation.y = Math.PI / 2;
+    signBoard.position.set(0.04, QUAY_TOP_Y + 1.85, signZ);
+    group.add(signBoard);
+
+    const signBoardBack = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.75), signMat);
+    signBoardBack.rotation.y = -Math.PI / 2;
+    signBoardBack.position.set(-0.04, QUAY_TOP_Y + 1.85, signZ);
+    group.add(signBoardBack);
+  }
+
+  // 8. Marcador / Sprite flutuante de identificação (visível e nítido de qualquer ângulo 3D)
+  const labelCanvas = document.createElement("canvas");
+  labelCanvas.width = 256;
+  labelCanvas.height = 64;
+  const lCtx = labelCanvas.getContext("2d");
+  if (lCtx) {
+    lCtx.fillStyle = "#991b1b";
+    lCtx.fillRect(3, 3, 250, 58);
+    lCtx.strokeStyle = "#ffffff";
+    lCtx.lineWidth = 3.5;
+    lCtx.strokeRect(5, 5, 246, 54);
+    lCtx.fillStyle = "#ffffff";
+    lCtx.font = "bold 21px Arial, sans-serif";
+    lCtx.textAlign = "center";
+    lCtx.textBaseline = "middle";
+    lCtx.fillText("CERCA · DIVISA DE EMPRESA", 128, 24, 240);
+    lCtx.font = "bold 13px Arial, sans-serif";
+    lCtx.fillStyle = "#fed7aa";
+    lCtx.fillText(`CAB. 278 ⮂ 277 · ${fenceM.toFixed(1).replace(".", ",")} m`, 128, 45, 240);
+  }
+  const labelTex = new THREE.CanvasTexture(labelCanvas);
+  labelTex.colorSpace = THREE.SRGBColorSpace;
+  labelTex.generateMipmaps = false;
+  const spriteMat = new THREE.SpriteMaterial({
+    map: labelTex,
+    transparent: true,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.position.set(0, QUAY_TOP_Y + 5.0, -15.0);
+  sprite.scale.set(13.0, 3.2, 1);
+  group.add(sprite);
+
+  scene.add(group);
+}
+
 function buildScene(THREE: ThreeModule, scene: import("three").Scene, scenario: Scenario) {
   const total = Math.max(1, totalQuayLength(scenario.segments));
   const segments = segmentOffsets(scenario.segments);
@@ -1320,6 +1610,7 @@ function buildScene(THREE: ThreeModule, scene: import("three").Scene, scenario: 
   const vesselRefs = scenario.vessels.map((vessel) => ({ vessel, ...addVessel(THREE, scene, vessel, total) }));
   addMooringLines(THREE, scene, scenario, total);
   addShoreManifolds(THREE, scene, scenario, total);
+  addCompanyBoundaryFence(THREE, scene, scenario, total);
 
   if (scenario.showPortainers !== false) {
     for (const portainer of scenario.portainers ?? DEFAULT_PORTAINERS) addPortainer(THREE, scene, portainer, total);
@@ -1525,6 +1816,7 @@ export default function Berth3DViewer({ scenario }: Berth3DViewerProps) {
         <span><i className="berth-3d-rope-key" /> Cabos amarelos</span>
         <span><i className="berth-3d-bollard-key" /> Cabeços numerados</span>
         <span><i style={{ display: "inline-block", width: "9px", height: "9px", background: "#b91c1c", borderRadius: "2px" }} /> Manifolds (297–296 / 294 / Terra)</span>
+        <span><i style={{ display: "inline-block", width: "9px", height: "9px", background: "#991b1b", borderRadius: "2px" }} /> Cerca / Divisa (278–277)</span>
       </div>
       {assignedLines.length > 0 && (
         <details className="berth-3d-connections">

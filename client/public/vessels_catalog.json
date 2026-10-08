@@ -9,7 +9,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "MALTA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "06/10/2026 09:18"
+    "updatedAt": "07/10/2026 23:53"
   },
   {
     "name": "CMA CGM PUCCINI",
@@ -71,7 +71,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "06/10/2026 09:18",
+    "updatedAt": "06/10/2026 23:11",
     "bayCount": 76,
     "bays": 76
   },
@@ -96,7 +96,7 @@
     "imo": "9850795",
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "06/10/2026 09:18"
+    "updatedAt": "07/10/2026 23:53"
   },
   {
     "name": "EVER LEADER",
@@ -108,7 +108,18 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "SINGAPORE",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "06/10/2026 09:18"
+    "updatedAt": "07/10/2026 23:53"
+  },
+  {
+    "name": "FELIXSTOWE",
+    "loa": 259.8,
+    "beam": 32.3,
+    "draft": 12.2,
+    "berthingSide": "bombordo",
+    "imo": "9227039",
+    "type": "CONTAINER SHIP (FULLY CELLULAR)",
+    "lastBerth": "TECONT1",
+    "updatedAt": "07/10/2026 23:53"
   },
   {
     "name": "KOTA PAHLAWAN",
@@ -120,7 +131,7 @@
     "type": "CONTAINER SHIP (FULLY CELLULAR)",
     "flag": "SINGAPORE",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "06/10/2026 09:18"
+    "updatedAt": "07/10/2026 23:53"
   },
   {
     "name": "LOG-IN PANTANAL",
@@ -145,6 +156,17 @@
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
     "updatedAt": "2026-10-01 22:32"
+  },
+  {
+    "name": "MAERSK CALLAO",
+    "loa": 183.15,
+    "beam": 32.23,
+    "draft": 7.6,
+    "berthingSide": "bombordo",
+    "imo": "9786152",
+    "type": "CHEMICAL/PRODUCTS TANKER",
+    "lastBerth": "TECONTPROLONG",
+    "updatedAt": "07/10/2026 23:53"
   },
   {
     "name": "MAERSK FORTALEZA",
@@ -176,10 +198,12 @@
     "draft": 11.4,
     "berthingSide": "boreste",
     "imo": "9612791",
-    "type": "CONTAINER SHIP (FULLY CELLULAR)",
+    "type": "Porta-Contêineres (Container Ship - Fully Cellular)",
     "flag": "BRAZIL",
     "lastBerth": "TECONT1",
-    "updatedAt": "02/10/2026 14:52"
+    "updatedAt": "07/10/2026 23:53",
+    "bayCount": 46,
+    "bays": 46
   },
   {
     "name": "NC BREDA",
@@ -188,10 +212,12 @@
     "draft": 8,
     "berthingSide": "boreste",
     "imo": "9612765",
-    "type": "CONTAINER SHIP (FULLY CELLULAR)",
+    "type": "Porta-Contêineres (Container Ship - Fully Cellular)",
     "flag": "BRAZIL",
     "lastBerth": "TECONT1",
-    "updatedAt": "06/10/2026 09:18"
+    "updatedAt": "06/10/2026 23:13",
+    "bayCount": 58,
+    "bays": 58
   },
   {
     "name": "OCEAN MERMAID",
@@ -212,10 +238,12 @@
     "draft": 8.9,
     "berthingSide": "boreste",
     "imo": "9193290",
-    "type": "CONTAINER SHIP (FULLY CELLULAR)",
+    "type": "Porta-Contêineres (Container Ship - Fully Cellular)",
     "flag": "LIBERIA",
     "lastBerth": "TECONTPROLONG",
-    "updatedAt": "01/10/2026 23:23"
+    "updatedAt": "06/10/2026 09:38",
+    "bayCount": 57,
+    "bays": 57
   },
   {
     "name": "ZIM BALTIMORE",
